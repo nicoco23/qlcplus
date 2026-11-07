@@ -80,7 +80,7 @@ Rectangle
         signal keyPressed()
         signal keyReleased()
 
-        radius: 3
+        radius: Math.min(8, height * 0.2)
         color: lit ? keyColor : (keyArea.pressed ? Qt.lighter(UISettings.bgControl, 1.3) : UISettings.bgMedium)
         border.color: lit ? Qt.lighter(keyColor, 1.3) : UISettings.borderColorDark
         border.width: 1
@@ -89,10 +89,10 @@ Rectangle
         {
             anchors.centerIn: parent
             text: key.text
-            color: key.lit ? "#111" : key.textColor
-            font.family: UISettings.robotoFontName
+            color: key.lit ? UISettings.bgStronger : key.textColor
+            font.family: UISettings.titleFontName
             font.pixelSize: key.fontSize
-            font.bold: true
+            font.letterSpacing: 1
         }
 
         MouseArea
@@ -131,7 +131,7 @@ Rectangle
                 {
                     text: qsTr("PAGE")
                     color: UISettings.fgMedium
-                    font.family: UISettings.robotoFontName
+                    font.family: UISettings.titleFontName
                     font.pixelSize: UISettings.textSizeDefault * 0.8
                     font.bold: true
                     Layout.rightMargin: pbRoot.gap
@@ -288,10 +288,13 @@ Rectangle
                             anchors.fill: parent
                             anchors.margins: 4
                             anchors.topMargin: parent.height * 0.12
+                            anchors.bottomMargin: execCell.height > pbRoot.unit * 1.5 ? parent.height * 0.18 : 2
                             text: modelData.label
                             color: modelData.running ? "white" : UISettings.fgLight
                             font.family: UISettings.robotoFontName
-                            font.pixelSize: Math.min(UISettings.textSizeDefault * 0.9, parent.height * 0.24)
+                            font.pixelSize: Math.max(9, Math.min(UISettings.textSizeDefault * 0.95, parent.height * 0.3))
+                            fontSizeMode: Text.Fit
+                            minimumPixelSize: 8
                             font.bold: modelData.running
                             wrapMode: Text.Wrap
                             elide: Text.ElideRight
@@ -301,7 +304,7 @@ Rectangle
 
                         Text
                         {
-                            visible: execCell.assigned
+                            visible: execCell.assigned && execCell.height > pbRoot.unit * 1.5
                             anchors.bottom: parent.bottom
                             anchors.right: parent.right
                             anchors.margins: 3
@@ -366,9 +369,9 @@ Rectangle
                     {
                         anchors.verticalCenter: parent.verticalCenter
                         x: 8
-                        text: qsTr("FONCTIONS")
+                        text: qsTr("Fonctions")
                         color: UISettings.fgMain
-                        font.family: UISettings.robotoFontName
+                        font.family: UISettings.titleFontName
                         font.pixelSize: UISettings.textSizeDefault * 0.8
                         font.bold: true
                     }
@@ -659,7 +662,7 @@ Rectangle
                             text: qsTr("GRAND\nMASTER")
                             horizontalAlignment: Text.AlignHCenter
                             color: UISettings.consoleRelease
-                            font.family: UISettings.robotoFontName
+                            font.family: UISettings.titleFontName
                             font.pixelSize: UISettings.textSizeDefault * 0.7
                             font.bold: true
                         }

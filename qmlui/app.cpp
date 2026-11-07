@@ -46,6 +46,10 @@
 #include "uimanager.h"
 #include "simpledesk.h"
 #include "playbackmanager.h"
+
+/** Name shown in the window title bar (KAHO fork). APPNAME is kept for
+ *  settings paths and file compatibility with QLC+ */
+#define KAHO_TITLE "KAHO Console"
 #include "showmanager.h"
 #include "fixtureeditor.h"
 #include "modelselector.h"
@@ -183,11 +187,14 @@ void App::startup()
     qmlRegisterType<ModelSelector>("org.qlcplus.classes", 1, 0, "ModelSelector");
     qmlRegisterType<FolderBrowser>("org.qlcplus.classes", 1, 0, "FolderBrowser");
 
-    setTitle(APPNAME);
+    setTitle(KAHO_TITLE);
     setIcon(QIcon(":/qlcplus.svg"));
 
     if (QFontDatabase::addApplicationFont(":/RobotoCondensed-Regular.ttf") < 0)
         qWarning() << "Roboto condensed cannot be loaded!";
+
+    if (QFontDatabase::addApplicationFont(":/NunitoRounded.ttf") < 0)
+        qWarning() << "Nunito Rounded cannot be loaded!";
 
     if (QFontDatabase::addApplicationFont(":/RobotoMono-Regular.ttf") < 0)
         qWarning() << "Roboto mono cannot be loaded!";
@@ -1008,7 +1015,7 @@ bool App::loadWorkspace(const QString &fileName)
 
     if (loadXML(localFilename) == QFile::NoError)
     {
-        setTitle(QString("%1 - %2").arg(APPNAME).arg(localFilename));
+        setTitle(QString("%1 - %2").arg(KAHO_TITLE).arg(localFilename));
         setFileName(localFilename);
         updateRecentFilesList(localFilename);
         setDocLoaded(true);
@@ -1136,7 +1143,7 @@ bool App::saveWorkspace(const QString &fileName)
         if (asFile.exists())
             asFile.remove();
 
-        setTitle(QString("%1 - %2").arg(APPNAME).arg(localFilename));
+        setTitle(QString("%1 - %2").arg(KAHO_TITLE).arg(localFilename));
         updateRecentFilesList(localFilename);
         return true;
     }

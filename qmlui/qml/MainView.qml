@@ -164,7 +164,7 @@ Rectangle
         x: mainView.safeLeft
         y: mainView.safeTop
         width: parent.width - mainView.safeLeft - mainView.safeRight
-        height: UISettings.iconSizeDefault
+        height: UISettings.iconSizeDefault * 0.8
         z: 50
         gradient: Gradient
         {
@@ -179,167 +179,116 @@ Rectangle
 
             ButtonGroup { id: menuBarGroup }
 
-            MenuBarEntry
+            Rectangle
             {
                 id: actEntry
-                Layout.alignment: Qt.AlignTop
-                imgSource: "qrc:/qlcplus.svg"
-                entryText: qsTr("Actions")
-                onPressed: actionsMenu.open()
-                autoExclusive: false
-                checkable: false
+                Layout.fillHeight: true
+                Layout.preferredWidth: wordmarkRow.width + UISettings.textSizeDefault * 1.6
+                color: actArea.pressed ? UISettings.bgControl : (actArea.containsMouse ? UISettings.bgMedium : "transparent")
 
-                Image
+                Row
+                {
+                    id: wordmarkRow
+                    anchors.centerIn: parent
+                    spacing: UISettings.textSizeDefault * 0.45
+
+                    Text
+                    {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "KAHO"
+                        color: UISettings.kahoMauve
+                        font.family: UISettings.titleFontName
+                        font.pixelSize: mainToolbar.height * 0.48
+                        font.letterSpacing: 1
+                    }
+                    Text
+                    {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "CONSOLE"
+                        color: UISettings.fgMedium
+                        font.family: UISettings.titleFontName
+                        font.pixelSize: mainToolbar.height * 0.26
+                        font.letterSpacing: 2
+                    }
+                    Text
+                    {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "▾"
+                        color: UISettings.fgMedium
+                        font.pixelSize: mainToolbar.height * 0.3
+                    }
+                }
+
+                // unsaved changes
+                Rectangle
                 {
                     visible: qlcplus.docModified
-                    source: "qrc:/filesave.svg"
-                    x: 1
-                    y: parent.height - height - 1
-                    height: parent.height / 3
-                    width: height
-                    sourceSize: Qt.size(width, height)
+                    width: mainToolbar.height * 0.16
+                    height: width
+                    radius: width / 2
+                    color: UISettings.kahoMauveSoft
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: mainToolbar.height * 0.15
                 }
-            }
-            MenuBarEntry
-            {
-                id: fnfEntry
-                showIcon: false
-                property string ctxName: "FIXANDFUNC"
-                Layout.alignment: Qt.AlignTop
-                property string ctxRes: "qrc:/FixturesAndFunctions.qml"
 
-                //visible: qlcplus.accessMask & App.AC_FunctionEditing
-                imgSource: "qrc:/editor.svg"
-                entryText: qsTr("Fixtures & Functions")
-                checked: false
-                ButtonGroup.group: menuBarGroup
-                onCheckedChanged:
+                MouseArea
                 {
-                    if (checked === true)
-                        switchToContext(fnfEntry.ctxName, fnfEntry.ctxRes)
+                    id: actArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onPressed: actionsMenu.open()
                 }
             }
-            MenuBarEntry
-            {
-                id: vcEntry
-                showIcon: false
-                Layout.alignment: Qt.AlignTop
-                property string ctxName: "VC"
-                property string ctxRes: "qrc:/VirtualConsole.qml"
 
-                visible: qlcplus.accessMask & App.AC_VCControl
-                imgSource: "qrc:/virtualconsole.svg"
-                entryText: qsTr("Virtual Console")
-                ButtonGroup.group: menuBarGroup
-                onCheckedChanged:
-                {
-                    if (checked === true)
-                        switchToContext(vcEntry.ctxName, vcEntry.ctxRes)
-                }
-                onRightClicked:
-                {
-                    vcEntry.visible = false
-                    contextManager.detachContext("VC")
-                }
-            }
-            MenuBarEntry
+            // window name, like a console status line
+            Text
             {
-                id: pbEntry
-                showIcon: false
-                Layout.alignment: Qt.AlignTop
-                property string ctxName: "PLAYBACKS"
-                property string ctxRes: "qrc:/Playbacks.qml"
-
-                visible: qlcplus.accessMask & App.AC_VCControl
-                imgSource: "qrc:/sliders.svg"
-                entryText: qsTr("Playbacks")
-                ButtonGroup.group: menuBarGroup
-                onCheckedChanged:
-                {
-                    if (checked === true)
-                        switchToContext(pbEntry.ctxName, pbEntry.ctxRes)
+                Layout.alignment: Qt.AlignVCenter
+                Layout.leftMargin: UISettings.textSizeDefault
+                text: {
+                    switch (currentContext)
+                    {
+                        case "FIXANDFUNC": return qsTr("Patch & programmation")
+                        case "VC": return qsTr("Console virtuelle")
+                        case "PLAYBACKS": return qsTr("Playbacks")
+                        case "SDESK": return qsTr("Pupitre simple")
+                        case "SHOWMGR": return qsTr("Show")
+                        case "IOMGR": return qsTr("Entrées / sorties")
+                        default: return ""
+                    }
                 }
-                onRightClicked:
-                {
-                    pbEntry.visible = false
-                    contextManager.detachContext("PLAYBACKS")
-                }
+                color: UISettings.fgLight
+                font.family: UISettings.titleFontName
+                font.pixelSize: mainToolbar.height * 0.4
             }
-            MenuBarEntry
-            {
-                id: sdEntry
-                showIcon: false
-                Layout.alignment: Qt.AlignTop
-                property string ctxName: "SDESK"
-                property string ctxRes: "qrc:/SimpleDesk.qml"
 
-                visible: qlcplus.accessMask & App.AC_SimpleDesk
-                imgSource: "qrc:/simpledesk.svg"
-                entryText: qsTr("Simple Desk")
-                ButtonGroup.group: menuBarGroup
-                onCheckedChanged:
-                {
-                    if (checked === true)
-                        switchToContext(sdEntry.ctxName, sdEntry.ctxRes)
-                }
-                onRightClicked:
-                {
-                    sdEntry.visible = false
-                    contextManager.detachContext("SDESK")
-                }
-            }
-            MenuBarEntry
-            {
-                id: smEntry
-                showIcon: false
-                Layout.alignment: Qt.AlignTop
-                property string ctxName: "SHOWMGR"
-                property string ctxRes: "qrc:/ShowManager.qml"
-
-                visible: qlcplus.accessMask & App.AC_ShowManager
-                imgSource: "qrc:/showmanager.svg"
-                entryText: qsTr("Show Manager")
-                ButtonGroup.group: menuBarGroup
-                onCheckedChanged:
-                {
-                    if (checked === true)
-                        switchToContext(smEntry.ctxName, smEntry.ctxRes)
-                }
-                onRightClicked:
-                {
-                    smEntry.visible = false
-                    contextManager.detachContext("SHOWMGR")
-                }
-            }
-            MenuBarEntry
-            {
-                id: ioEntry
-                showIcon: false
-                Layout.alignment: Qt.AlignTop
-                property string ctxName: "IOMGR"
-                property string ctxRes: "qrc:/InputOutputManager.qml"
-
-                visible: qlcplus.accessMask & App.AC_InputOutput
-                imgSource: "qrc:/inputoutput.svg"
-                entryText: qsTr("Input/Output")
-                ButtonGroup.group: menuBarGroup
-                onCheckedChanged:
-                {
-                    if (checked === true)
-                        switchToContext(ioEntry.ctxName, ioEntry.ctxRes)
-                }
-                onRightClicked:
-                {
-                    ioEntry.visible = false
-                    contextManager.detachContext("IOMGR")
-                }
-            }
             Rectangle
             {
                 // acts like an horizontal spacer
                 Layout.fillWidth: true
                 implicitHeight: parent.height
                 color: "transparent"
+            }
+
+            // ################## CLOCK ##################
+            Text
+            {
+                id: consoleClock
+                Layout.alignment: Qt.AlignVCenter
+                Layout.rightMargin: UISettings.textSizeDefault
+                color: UISettings.fgLight
+                font.family: UISettings.robotoFontName
+                font.pixelSize: mainToolbar.height * 0.38
+                text: Qt.formatTime(new Date(), "HH:mm:ss")
+
+                Timer
+                {
+                    interval: 1000
+                    running: true
+                    repeat: true
+                    onTriggered: consoleClock.text = Qt.formatTime(new Date(), "HH:mm:ss")
+                }
             }
 
             // ################## DMX DUMP ##################
@@ -616,6 +565,167 @@ Rectangle
         } // end of RowLayout
     } // end of mainToolbar
 
+    /* Console window keys */
+    Rectangle
+    {
+        id: windowKeysBar
+        visible: mainToolbar.visible
+        x: mainView.safeLeft
+        y: parent.height - height - mainView.safeBottom
+        width: parent.width - mainView.safeLeft - mainView.safeRight
+        height: UISettings.iconSizeDefault * 1.05
+        z: 50
+        color: UISettings.bgStronger
+
+        Rectangle
+        {
+            width: parent.width
+            height: 1
+            color: UISettings.bgControl
+        }
+
+        RowLayout
+        {
+            anchors.fill: parent
+            anchors.margins: Math.max(3, height * 0.08)
+            spacing: Math.max(3, height * 0.08)
+
+            ConsoleWindowKey
+            {
+                id: fnfEntry
+                property string ctxName: "FIXANDFUNC"
+                property string ctxRes: "qrc:/FixturesAndFunctions.qml"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                entryText: qsTr("Patch & prog")
+                keyHint: "F1"
+                ButtonGroup.group: menuBarGroup
+                onCheckedChanged:
+                {
+                    if (checked === true)
+                        switchToContext(fnfEntry.ctxName, fnfEntry.ctxRes)
+                }
+            }
+            ConsoleWindowKey
+            {
+                id: vcEntry
+                property string ctxName: "VC"
+                property string ctxRes: "qrc:/VirtualConsole.qml"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                entryText: qsTr("Console")
+                keyHint: "F2"
+                ButtonGroup.group: menuBarGroup
+                visible: qlcplus.accessMask & App.AC_VCControl
+                onCheckedChanged:
+                {
+                    if (checked === true)
+                        switchToContext(vcEntry.ctxName, vcEntry.ctxRes)
+                }
+                onRightClicked:
+                {
+                    vcEntry.visible = false
+                    contextManager.detachContext("VC")
+                }
+            }
+            ConsoleWindowKey
+            {
+                id: pbEntry
+                property string ctxName: "PLAYBACKS"
+                property string ctxRes: "qrc:/Playbacks.qml"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                entryText: qsTr("Playbacks")
+                keyHint: "F3"
+                ButtonGroup.group: menuBarGroup
+                visible: qlcplus.accessMask & App.AC_VCControl
+                onCheckedChanged:
+                {
+                    if (checked === true)
+                        switchToContext(pbEntry.ctxName, pbEntry.ctxRes)
+                }
+                onRightClicked:
+                {
+                    pbEntry.visible = false
+                    contextManager.detachContext("PLAYBACKS")
+                }
+            }
+            ConsoleWindowKey
+            {
+                id: sdEntry
+                property string ctxName: "SDESK"
+                property string ctxRes: "qrc:/SimpleDesk.qml"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                entryText: qsTr("Pupitre")
+                keyHint: "F4"
+                ButtonGroup.group: menuBarGroup
+                visible: qlcplus.accessMask & App.AC_SimpleDesk
+                onCheckedChanged:
+                {
+                    if (checked === true)
+                        switchToContext(sdEntry.ctxName, sdEntry.ctxRes)
+                }
+                onRightClicked:
+                {
+                    sdEntry.visible = false
+                    contextManager.detachContext("SDESK")
+                }
+            }
+            ConsoleWindowKey
+            {
+                id: smEntry
+                property string ctxName: "SHOWMGR"
+                property string ctxRes: "qrc:/ShowManager.qml"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                entryText: qsTr("Show")
+                keyHint: "F5"
+                ButtonGroup.group: menuBarGroup
+                visible: qlcplus.accessMask & App.AC_ShowManager
+                onCheckedChanged:
+                {
+                    if (checked === true)
+                        switchToContext(smEntry.ctxName, smEntry.ctxRes)
+                }
+                onRightClicked:
+                {
+                    smEntry.visible = false
+                    contextManager.detachContext("SHOWMGR")
+                }
+            }
+            ConsoleWindowKey
+            {
+                id: ioEntry
+                property string ctxName: "IOMGR"
+                property string ctxRes: "qrc:/InputOutputManager.qml"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                entryText: qsTr("Entrées / sorties")
+                keyHint: "F6"
+                ButtonGroup.group: menuBarGroup
+                visible: qlcplus.accessMask & App.AC_InputOutput
+                onCheckedChanged:
+                {
+                    if (checked === true)
+                        switchToContext(ioEntry.ctxName, ioEntry.ctxRes)
+                }
+                onRightClicked:
+                {
+                    ioEntry.visible = false
+                    contextManager.detachContext("IOMGR")
+                }
+            }
+        }
+
+        Shortcut { sequence: "F1"; onActivated: fnfEntry.checked = true }
+        Shortcut { sequence: "F2"; enabled: vcEntry.visible; onActivated: vcEntry.checked = true }
+        Shortcut { sequence: "F3"; enabled: pbEntry.visible; onActivated: pbEntry.checked = true }
+        Shortcut { sequence: "F4"; enabled: sdEntry.visible; onActivated: sdEntry.checked = true }
+        Shortcut { sequence: "F5"; enabled: smEntry.visible; onActivated: smEntry.checked = true }
+        Shortcut { sequence: "F6"; enabled: ioEntry.visible; onActivated: ioEntry.checked = true }
+    }
+
     Loader
     {
         id: showWizardOverlay
@@ -632,7 +742,7 @@ Rectangle
         x: mainView.safeLeft
         y: mainView.safeTop + (mainToolbar.visible ? mainToolbar.height : 0)
         width: parent.width - mainView.safeLeft - mainView.safeRight
-        height: parent.height - y - mainView.safeBottom
+        height: parent.height - y - mainView.safeBottom - (windowKeysBar.visible ? windowKeysBar.height : 0)
 
         Component.onCompleted:
         {

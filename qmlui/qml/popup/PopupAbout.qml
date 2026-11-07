@@ -47,10 +47,12 @@ CustomPopupDialog
             Text
             {
                 color: UISettings.fgMain
-                linkColor: "#8AC800"
+                linkColor: UISettings.kahoMauve
                 font.family: UISettings.robotoFontName
                 font.pixelSize: UISettings.textSizeDefault
-                text: "<h3>" + qlcplus.appName + "<br>" + qlcplus.appVersion + "</h3>\n" +
+                text: "<h3>KAHO Console</h3>" +
+                      qsTr("Version KAHO basée sur") + " " +
+                      "<h3>" + qlcplus.appName + "<br>" + qlcplus.appVersion + "</h3>\n" +
                       "Copyright Ⓒ <b>Massimo Callegari, Heikki Junnila</b> " + qsTr("and contributors") + "<br>" +
                       qsTr("Website") + ": <a href='https://www.qlcplus.org'>https://www.qlcplus.org</a><br><br>" +
                       qsTr("This application is licensed under the terms of the") +

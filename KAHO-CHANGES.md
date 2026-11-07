@@ -19,11 +19,18 @@ the fork changes. All original copyright notices are kept.
   other pads = execute buttons, buttons under the grid = GO (SHIFT + GO =
   release), right column = pages (SHIFT + last = release all). Soft takeover
   after a page change.
-- **Console theme**: new default colors in `qmlui/qml/UISettings.qml`
-  (charcoal surfaces, amber accent) and flat text tabs in the main toolbar
-  (`MenuBarEntry.showIcon`).
+- **KAHO look**: KAHO charter colors in `qmlui/qml/UISettings.qml` (dark
+  surfaces, soft mauve accent), rounded display face *Nunito* (SIL OFL 1.1,
+  `resources/fonts/NunitoRounded.ttf`, renamed instance of Nunito ExtraBold,
+  license in `resources/fonts/OFL-Nunito.txt`), window title "KAHO Console",
+  About box mentions the fork and keeps the QLC+ credits.
+- **Console layout**: slim status bar on top (KAHO wordmark opening the
+  Actions menu, current window, clock, BPM), big window keys at the bottom
+  (`qmlui/qml/ConsoleWindowKey.qml`) with F1-F6 shortcuts, instead of the
+  top toolbar tabs.
 - Files touched to wire the above: `qmlui/app.*`, `qmlui/contextmanager.cpp`,
-  `qmlui/qml/MainView.qml`, `qmlui/qml/MenuBarEntry.qml`, `qmlui/qmlui.qrc`,
+  `qmlui/qml/MainView.qml`, `qmlui/qml/MenuBarEntry.qml`, `qmlui/qml/popup/PopupAbout.qml`,
+  `qmlui/qmlui.qrc`, `resources/fonts/fonts.qrc`,
   `qmlui/CMakeLists.txt`.
 - CI: `.github/workflows/kaho-windows.yml` builds the Windows installer on every
   push; the upstream matrix (`build.yml`) only runs on pull requests or on demand.

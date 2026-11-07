@@ -25,53 +25,61 @@ QtObject
 {
     property string robotoFontName: "Roboto Condensed"
     property string fontAwesomeFontName: "Font Awesome 7 Free"
+    /** Rounded display face for titles and console keys (KAHO charter) */
+    property string titleFontName: "Nunito Rounded"
 
     property real scalingFactor: 1.0
 
-    /* Colors - KAHO console theme: charcoal surfaces, amber accent */
-    property color bgStronger:      "#0d0e10"
-    property color bgStrong:        "#16181b"
-    property color bgMedium:        "#202327"
-    property color bgControl:       "#353a41"
-    property color bgLight:         "#5b616a"
-    property color bgLighter:       "#7d838c"
-    property color bgFixtureOdd:    "#2a2f2a"
-    property color bgFixtureEven:   "#2a2c33"
+    /* Colors - KAHO charter: dark background, black / white / grey,
+       soft mauve as the only accent */
+    property color bgStronger:      "#09080c"
+    property color bgStrong:        "#121117"
+    property color bgMedium:        "#1b1a21"
+    property color bgControl:       "#2c2a34"
+    property color bgLight:         "#4d4a57"
+    property color bgLighter:       "#75717f"
+    property color bgFixtureOdd:    "#211f29"
+    property color bgFixtureEven:   "#1d1c24"
 
-    property color fgMain:          "#ececec"
-    property color fgMedium:        "#80868f"
-    property color fgLight:         "#b4b9c0"
+    property color fgMain:          "#f3f2f6"
+    property color fgMedium:        "#8a8794"
+    property color fgLight:         "#bebbc7"
 
-    property color sectionHeader:     "#2b3038"
-    property color sectionHeaderDiv:  "#1b1e23"
-    property color highlight:         "#ffa31a"
-    property color highlightPressed:  "#a86500"
-    property color hover:             "#8a8f96"
-    property color selection:         "#ffd166"
-    property color activeDropArea:    "#9DFF52"
-    property color borderColorDark:   "#050506"
+    property color sectionHeader:     "#25232d"
+    property color sectionHeaderDiv:  "#16151b"
+    property color highlight:         "#a98bff"
+    property color highlightPressed:  "#6b54c4"
+    property color hover:             "#8a8794"
+    property color selection:         "#cfc0ff"
+    property color activeDropArea:    "#a98bff"
+    property color borderColorDark:   "#050407"
 
-    property color toolbarStartMain:  "#1b1d21"
-    property color toolbarStartSub:   "#202327"
-    property color toolbarEnd:        "#0d0e10"
-    property color toolbarHoverStart: "#2b2f35"
-    property color toolbarHoverEnd:   "#121316"
+    property color toolbarStartMain:  "#121117"
+    property color toolbarStartSub:   "#1b1a21"
+    property color toolbarEnd:        "#09080c"
+    property color toolbarHoverStart: "#26242e"
+    property color toolbarHoverEnd:   "#121117"
 
-    property color toolbarSelectionMain: "#ffa31a"
-    property color toolbarSelectionSub:  "#ffd166"
+    property color toolbarSelectionMain: "#a98bff"
+    property color toolbarSelectionSub:  "#cfc0ff"
 
-    /* Console keys and playbacks */
-    property color consoleAccent:   "#ffa31a"
-    property color consoleGo:       "#3fd07a"
-    property color consoleRelease:  "#ff5a5f"
+    /* KAHO accent */
+    property color kahoMauve:       "#a98bff"
+    property color kahoMauveSoft:   "#cfc0ff"
+    property color kahoMauveDeep:   "#3a2f5c"
 
-    /* Function type colors (playback stripes, execute buttons) */
-    property color typeScene:       "#ffb43a"
-    property color typeChaser:      "#35c8f0"
-    property color typeEfx:         "#d46cff"
-    property color typeMatrix:      "#56e39f"
-    property color typeCollection:  "#8f8cff"
-    property color typeOther:       "#9aa0a8"
+    /* Console keys and playbacks (functional colors stay readable at a glance) */
+    property color consoleAccent:   "#a98bff"
+    property color consoleGo:       "#5fd39a"
+    property color consoleRelease:  "#ff6b7a"
+
+    /* Function type colors: pastel, so that mauve stays the main accent */
+    property color typeScene:       "#cfc0ff"
+    property color typeChaser:      "#8fd6e8"
+    property color typeEfx:         "#f2a9cf"
+    property color typeMatrix:      "#9ee3b9"
+    property color typeCollection:  "#ecc993"
+    property color typeOther:       "#a29fac"
 
     /* Sizes */
     property int  textSizeDefault:  screenPixelDensity * scalingFactor * 4.5
