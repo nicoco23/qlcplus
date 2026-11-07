@@ -321,8 +321,10 @@ void PlaybackManager::applyFaderLevel(int page, int index)
     {
         if (st.flashing == false)
         {
-            stopFunction(f, parent);
+            if (st.owned)
+                stopFunction(f, parent);
             st.attributeId = -1;
+            st.owned = false;
         }
         return;
     }
@@ -333,7 +335,10 @@ void PlaybackManager::applyFaderLevel(int page, int index)
         f->adjustAttribute(st.level, st.attributeId);
 
     if (f->stopped())
+    {
         startFunction(f, parent, st.level);
+        st.owned = true;
+    }
 }
 
 void PlaybackManager::setFaderLevel(int index, qreal level)
@@ -378,6 +383,7 @@ void PlaybackManager::go(int index)
     qreal level = st.level > 0 ? st.level : 1.0;
     st.attributeId = f->requestAttributeOverride(Function::Intensity, level);
     startFunction(f, parentId(true, m_page, index), level);
+    st.owned = true;
     slotRefresh();
 }
 
@@ -424,6 +430,7 @@ void PlaybackManager::flash(int index, bool pressed)
         if (f->stopped())
         {
             st.flashStarted = true;
+            st.owned = true;
             st.attributeId = f->requestAttributeOverride(Function::Intensity, 1.0);
             startFunction(f, parent, 1.0);
         }
@@ -438,6 +445,7 @@ void PlaybackManager::flash(int index, bool pressed)
         {
             stopFunction(f, parent);
             st.attributeId = -1;
+            st.owned = false;
         }
         else if (st.attributeId != Function::invalidAttributeId())
         {
@@ -456,6 +464,7 @@ void PlaybackManager::release(int index)
     FaderState &st = fader(m_page, index);
     stopFunction(functionAt(st.functionId), parentId(true, m_page, index));
     st.attributeId = -1;
+    st.owned = false;
     slotRefresh();
 }
 
@@ -521,6 +530,7 @@ void PlaybackManager::releaseAll()
             stopFunction(functionAt(st.functionId), parentId(true, p, i));
             st.attributeId = -1;
             st.level = 0;
+            st.owned = false;
         }
         for (int i = 0; i < ExecCount; i++)
             stopFunction(functionAt(exec(p, i).functionId), parentId(false, p, i));
@@ -539,7 +549,7 @@ void PlaybackManager::slotRefresh()
     {
         const FaderState &st = fader(m_page, i);
         Function *f = functionAt(st.functionId);
-        QVariantMap map = describe(st.functionId, f && f->isRunning());
+        QVariantMap map = describe(st.functionId, f && f->isRunning() && st.owned);
         map.insert("level", st.level);
         map.insert("pickup", st.needsPickup);
         map.insert("flashing", st.flashing);
@@ -761,7 +771,7 @@ void PlaybackManager::updateControllerLeds(bool force)
     {
         const FaderState &st = fader(m_page, i);
         Function *f = functionAt(st.functionId);
-        bool running = f && f->isRunning();
+        bool running = f && f->isRunning() && st.owned;
 
         // Bottom pad row: FLASH
         uchar flashLed = f == nullptr ? LED_OFF : (st.flashing ? LED_YELLOW : (running ? LED_RED_BLINK : LED_RED));

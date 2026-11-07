@@ -136,6 +136,7 @@ private:
         bool flashStarted = false;
         bool flashing = false;
         bool needsPickup = false;
+        bool owned = false;         // started from this playback (not by a chaser, a VC button...)
     };
 
     struct ExecState

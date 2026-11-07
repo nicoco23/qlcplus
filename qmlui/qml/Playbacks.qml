@@ -556,7 +556,8 @@ Rectangle
                         {
                             Layout.fillWidth: true
                             horizontalAlignment: Text.AlignHCenter
-                            text: modelData.pickup ? qsTr("REPRISE") : Math.round(modelData.level * 100) + "%"
+                            text: modelData.pickup ? qsTr("REPRISE")
+                                  : (modelData.running && modelData.level === 0 ? qsTr("GO · 100%") : Math.round(modelData.level * 100) + "%")
                             color: modelData.pickup ? UISettings.consoleAccent
                                    : (modelData.level > 0 ? UISettings.fgMain : UISettings.fgMedium)
                             font.family: UISettings.robotoFontName
