@@ -40,7 +40,9 @@ Button
     property color faColor: UISettings.bgStrong
     property string entryText: ""
     property real mFontSize: UISettings.textSizeDefault * 0.70
-    property int iconSize: imgSource ? height - 4 - topPadding - bottomPadding : 0
+    /** false = flat console tab: no icon, upper case label, accent color when checked */
+    property bool showIcon: true
+    property int iconSize: (imgSource && showIcon) ? height - 4 - topPadding - bottomPadding : 0
     property int iconRotation: 0
 
     property Gradient bgGradient: defBgGradient
@@ -78,7 +80,7 @@ Button
             Image
             {
                 id: btnIcon
-                visible: control.imgSource
+                visible: control.imgSource && control.showIcon
                 x: 2
                 anchors.verticalCenter: parent.verticalCenter
                 height: control.iconSize
@@ -103,9 +105,12 @@ Button
             {
                 id: btnLabel
                 height: control.height
-                label: control.entryText
+                label: control.showIcon ? control.entryText : control.entryText.toUpperCase()
                 fontSize: control.mFontSize
                 fontBold: true
+                labelColor: !control.showIcon && control.checked ? control.checkedColor : UISettings.fgMain
+                leftMargin: control.showIcon ? 0 : UISettings.textSizeDefault * 0.8
+                rightMargin: control.showIcon ? 0 : UISettings.textSizeDefault * 0.8
 
                 Rectangle
                 {

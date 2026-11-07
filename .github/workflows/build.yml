@@ -1,6 +1,7 @@
 name: QLCplus Github Actions CI Build
 
-on: ["push", "pull_request"]
+# KAHO fork: full upstream matrix only on demand, see kaho-windows.yml for push builds
+on: ["pull_request", "workflow_dispatch"]
 
 jobs:
   build-linux:

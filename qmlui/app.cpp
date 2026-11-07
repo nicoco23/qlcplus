@@ -45,6 +45,7 @@
 #include "app.h"
 #include "uimanager.h"
 #include "simpledesk.h"
+#include "playbackmanager.h"
 #include "showmanager.h"
 #include "fixtureeditor.h"
 #include "modelselector.h"
@@ -109,6 +110,7 @@ App::App()
     , m_ioManager(nullptr)
     , m_showManager(nullptr)
     , m_simpleDesk(nullptr)
+    , m_playbackManager(nullptr)
     , m_videoProvider(nullptr)
     , m_networkManager(nullptr)
     , m_uiManager(nullptr)
@@ -211,6 +213,7 @@ void App::startup()
 
     m_virtualConsole = new VirtualConsole(this, m_doc, m_contextManager);
     m_showManager = new ShowManager(this, m_doc);
+    m_playbackManager = new PlaybackManager(this, m_doc);
     connect(m_showManager, &ShowManager::itemClicked, m_contextManager, &ContextManager::setLastClickedType);
 
     m_networkManager = new NetworkManager(this, m_doc, m_virtualConsole, m_simpleDesk);
@@ -241,6 +244,7 @@ void App::startup()
     m_contextManager->registerContext(m_simpleDesk);
     m_contextManager->registerContext(m_showManager);
     m_contextManager->registerContext(m_ioManager);
+    m_contextManager->registerContext(m_playbackManager);
 
     // register an uncreatable type just to use the enums in QML
     qmlRegisterUncreatableType<ContextManager>("org.qlcplus.classes", 1, 0, "ContextManager", "Can't create a ContextManager!");
@@ -747,6 +751,8 @@ void App::clearDocument()
     //m_simpleDesk->resetContents(); // TODO
     m_showManager->resetContents();
     m_virtualConsole->resetContents();
+    if (m_playbackManager)
+        m_playbackManager->resetContents();
 
     // Drop the preview items *before* the Doc is emptied: they hold references
     // to fixtures that clearContents() is about to delete
@@ -1214,6 +1220,10 @@ bool App::loadXML(QXmlStreamReader &doc, bool goToConsole, bool fromMemory)
         {
             m_virtualConsole->loadXML(doc);
         }
+        else if (doc.name() == KXMLQLCPlaybacks)
+        {
+            m_playbackManager->loadXML(doc);
+        }
 #if 0
         else if (doc.name() == KXMLQLCSimpleDesk)
         {
@@ -1296,6 +1306,9 @@ QFile::FileError App::saveXML(const QString& fileName, bool autosave)
 
     /* Write virtual console to the XML document */
     m_virtualConsole->saveXML(&doc);
+
+    /* Write the playback pages */
+    m_playbackManager->saveXML(&doc);
 
     /* Write Simple Desk to the XML document */
     //SimpleDesk::instance()->saveXML(&doc);

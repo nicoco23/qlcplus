@@ -49,6 +49,7 @@ set(SRC_FILES
     mainviewdmx.cpp mainviewdmx.h
     modelselector.cpp modelselector.h
     palettemanager.cpp palettemanager.h
+    playbackmanager.cpp playbackmanager.h
     previewcontext.cpp previewcontext.h
     rgbmatrixeditor.cpp rgbmatrixeditor.h
     sceneeditor.cpp sceneeditor.h

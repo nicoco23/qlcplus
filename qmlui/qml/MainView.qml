@@ -63,6 +63,8 @@ Rectangle
             item = smEntry
         else if (ctx === "IOMGR")
             item = ioEntry
+        else if (ctx === "PLAYBACKS")
+            item = pbEntry
 
         if (item)
         {
@@ -201,6 +203,7 @@ Rectangle
             MenuBarEntry
             {
                 id: fnfEntry
+                showIcon: false
                 property string ctxName: "FIXANDFUNC"
                 Layout.alignment: Qt.AlignTop
                 property string ctxRes: "qrc:/FixturesAndFunctions.qml"
@@ -219,6 +222,7 @@ Rectangle
             MenuBarEntry
             {
                 id: vcEntry
+                showIcon: false
                 Layout.alignment: Qt.AlignTop
                 property string ctxName: "VC"
                 property string ctxRes: "qrc:/VirtualConsole.qml"
@@ -240,7 +244,31 @@ Rectangle
             }
             MenuBarEntry
             {
+                id: pbEntry
+                showIcon: false
+                Layout.alignment: Qt.AlignTop
+                property string ctxName: "PLAYBACKS"
+                property string ctxRes: "qrc:/Playbacks.qml"
+
+                visible: qlcplus.accessMask & App.AC_VCControl
+                imgSource: "qrc:/sliders.svg"
+                entryText: qsTr("Playbacks")
+                ButtonGroup.group: menuBarGroup
+                onCheckedChanged:
+                {
+                    if (checked === true)
+                        switchToContext(pbEntry.ctxName, pbEntry.ctxRes)
+                }
+                onRightClicked:
+                {
+                    pbEntry.visible = false
+                    contextManager.detachContext("PLAYBACKS")
+                }
+            }
+            MenuBarEntry
+            {
                 id: sdEntry
+                showIcon: false
                 Layout.alignment: Qt.AlignTop
                 property string ctxName: "SDESK"
                 property string ctxRes: "qrc:/SimpleDesk.qml"
@@ -263,6 +291,7 @@ Rectangle
             MenuBarEntry
             {
                 id: smEntry
+                showIcon: false
                 Layout.alignment: Qt.AlignTop
                 property string ctxName: "SHOWMGR"
                 property string ctxRes: "qrc:/ShowManager.qml"
@@ -285,6 +314,7 @@ Rectangle
             MenuBarEntry
             {
                 id: ioEntry
+                showIcon: false
                 Layout.alignment: Qt.AlignTop
                 property string ctxName: "IOMGR"
                 property string ctxRes: "qrc:/InputOutputManager.qml"

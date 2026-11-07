@@ -28,37 +28,50 @@ QtObject
 
     property real scalingFactor: 1.0
 
-    /* Colors */
-    property color bgStronger:      "#161616"
-    property color bgStrong:        "#232323"
-    property color bgMedium:        "#333"
-    property color bgControl:       "#555"
-    property color bgLight:         "#6F6F6F"
-    property color bgLighter:       "#8F8F8F"
-    property color bgFixtureOdd:    "#414b41"
-    property color bgFixtureEven:   "#42444b"
+    /* Colors - KAHO console theme: charcoal surfaces, amber accent */
+    property color bgStronger:      "#0d0e10"
+    property color bgStrong:        "#16181b"
+    property color bgMedium:        "#202327"
+    property color bgControl:       "#353a41"
+    property color bgLight:         "#5b616a"
+    property color bgLighter:       "#7d838c"
+    property color bgFixtureOdd:    "#2a2f2a"
+    property color bgFixtureEven:   "#2a2c33"
 
-    property color fgMain:          "white"
-    property color fgMedium:        "#888"
-    property color fgLight:         "#aaa"
+    property color fgMain:          "#ececec"
+    property color fgMedium:        "#80868f"
+    property color fgLight:         "#b4b9c0"
 
-    property color sectionHeader:     "#31456B"
-    property color sectionHeaderDiv:  "#22304a"
-    property color highlight:         "#0978FF"
-    property color highlightPressed:  "#044089"
-    property color hover:             "#B6B6B6"
-    property color selection:         "yellow"
+    property color sectionHeader:     "#2b3038"
+    property color sectionHeaderDiv:  "#1b1e23"
+    property color highlight:         "#ffa31a"
+    property color highlightPressed:  "#a86500"
+    property color hover:             "#8a8f96"
+    property color selection:         "#ffd166"
     property color activeDropArea:    "#9DFF52"
-    property color borderColorDark:   "#111"
+    property color borderColorDark:   "#050506"
 
-    property color toolbarStartMain:  "#222"
-    property color toolbarStartSub:   "#333"
-    property color toolbarEnd:        "#111"
-    property color toolbarHoverStart: "#444"
-    property color toolbarHoverEnd:   "#171717"
+    property color toolbarStartMain:  "#1b1d21"
+    property color toolbarStartSub:   "#202327"
+    property color toolbarEnd:        "#0d0e10"
+    property color toolbarHoverStart: "#2b2f35"
+    property color toolbarHoverEnd:   "#121316"
 
-    property color toolbarSelectionMain: "#12B4FF"
-    property color toolbarSelectionSub:  "yellow"
+    property color toolbarSelectionMain: "#ffa31a"
+    property color toolbarSelectionSub:  "#ffd166"
+
+    /* Console keys and playbacks */
+    property color consoleAccent:   "#ffa31a"
+    property color consoleGo:       "#3fd07a"
+    property color consoleRelease:  "#ff5a5f"
+
+    /* Function type colors (playback stripes, execute buttons) */
+    property color typeScene:       "#ffb43a"
+    property color typeChaser:      "#35c8f0"
+    property color typeEfx:         "#d46cff"
+    property color typeMatrix:      "#56e39f"
+    property color typeCollection:  "#8f8cff"
+    property color typeOther:       "#9aa0a8"
 
     /* Sizes */
     property int  textSizeDefault:  screenPixelDensity * scalingFactor * 4.5

@@ -30,6 +30,7 @@
 class MainView2D;
 class ShowManager;
 class SimpleDesk;
+class PlaybackManager;
 class UiManager;
 class ActionManager;
 class FixtureBrowser;
@@ -256,6 +257,7 @@ private:
     VirtualConsole *m_virtualConsole;
     ShowManager *m_showManager;
     SimpleDesk *m_simpleDesk;
+    PlaybackManager *m_playbackManager;
     ActionManager *m_actionManager;
     VideoProvider *m_videoProvider;
     NetworkManager *m_networkManager;
