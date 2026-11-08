@@ -137,6 +137,10 @@ Rectangle
     }
 
     focus: true
+    // keyboard shortcuts work as soon as the window is shown, without a first click
+    Component.onCompleted: Qt.callLater(forceActiveFocus)
+    onVisibleChanged: if (visible) Qt.callLater(forceActiveFocus)
+
     Keys.onPressed: (event) =>
     {
         if (event.key === Qt.Key_Escape)

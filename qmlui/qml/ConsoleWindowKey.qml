@@ -30,6 +30,7 @@ Button
 
     checkable: true
     hoverEnabled: true
+    focusPolicy: Qt.NoFocus     // keep the keyboard on the window (Playbacks shortcuts)
     padding: 0
 
     property string entryText: ""
