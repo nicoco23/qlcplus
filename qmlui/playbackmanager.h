@@ -103,6 +103,23 @@ public:
     /* Execute grid (index on the current page) */
     Q_INVOKABLE void execPress(int index, bool pressed);
     Q_INVOKABLE void assignExec(int index, quint32 functionId);
+    Q_INVOKABLE void setExecFlashMode(int index, bool flash);
+
+    /* Custom label and color of a slot ("" = function name / type color) */
+    Q_INVOKABLE void setFaderLabel(int index, const QString &label);
+    Q_INVOKABLE void setFaderColor(int index, const QString &color);
+    Q_INVOKABLE void setExecLabel(int index, const QString &label);
+    Q_INVOKABLE void setExecColor(int index, const QString &color);
+
+    /** Swap or move two slots of the current page (drag & drop) */
+    Q_INVOKABLE void moveFader(int from, int to);
+    Q_INVOKABLE void moveExec(int from, int to);
+
+    /** Put a function on the first free playback of the page, or the first free
+     *  execute button if every playback is used. Returns false if the page is full */
+    Q_INVOKABLE bool assignToFree(quint32 functionId);
+
+    Q_INVOKABLE void setPageName(int page, const QString &name);
 
     /** Release every playback and execute started from here */
     Q_INVOKABLE void releaseAll();
@@ -137,12 +154,17 @@ private:
         bool flashing = false;
         bool needsPickup = false;
         bool owned = false;         // started from this playback (not by a chaser, a VC button...)
+        QString label;
+        QString color;
     };
 
     struct ExecState
     {
         quint32 functionId = 0xFFFFFFFF;
         bool flashStarted = false;
+        bool flashMode = false;     // momentary: runs only while the button is held
+        QString label;
+        QString color;
     };
 
     FaderState &fader(int page, int index);
@@ -166,6 +188,7 @@ private:
     int m_page;
     QVector<FaderState> m_faders;   // PageCount * FaderCount
     QVector<ExecState> m_execs;     // PageCount * ExecCount
+    QStringList m_pageNames;        // PageCount
     quint32 m_armedFunction;
 
     QVariantList m_fadersCache;

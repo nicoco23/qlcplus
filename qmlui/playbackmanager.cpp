@@ -39,6 +39,11 @@
 #define KXMLQLCPlaybacksExec      QStringLiteral("Exec")
 #define KXMLQLCPlaybacksIndex     QStringLiteral("Index")
 #define KXMLQLCPlaybacksFunction  QStringLiteral("Function")
+#define KXMLQLCPlaybacksName      QStringLiteral("Name")
+#define KXMLQLCPlaybacksLabel     QStringLiteral("Label")
+#define KXMLQLCPlaybacksColor     QStringLiteral("Color")
+#define KXMLQLCPlaybacksMode      QStringLiteral("Mode")
+#define KXMLQLCPlaybacksFlash     QStringLiteral("Flash")
 
 /** Parent IDs used to start functions from this surface. They sit far
  *  above Virtual Console widget IDs so they never collide with them. */
@@ -75,6 +80,7 @@ PlaybackManager::PlaybackManager(QQuickView *view, Doc *doc, QObject *parent)
     , m_page(0)
     , m_faders(PageCount * FaderCount)
     , m_execs(PageCount * ExecCount)
+    , m_pageNames(PageCount)
     , m_armedFunction(Function::invalidId())
     , m_grandMasterCache(-1)
     , m_refreshTicks(0)
@@ -485,14 +491,37 @@ void PlaybackManager::assignFader(int index, quint32 functionId)
 
 void PlaybackManager::execPress(int index, bool pressed)
 {
-    if (index < 0 || index >= ExecCount || pressed == false)
+    if (index < 0 || index >= ExecCount)
         return;
 
-    Function *f = functionAt(exec(m_page, index).functionId);
+    ExecState &st = exec(m_page, index);
+    Function *f = functionAt(st.functionId);
     if (f == nullptr)
         return;
 
     int parent = parentId(false, m_page, index);
+
+    if (st.flashMode)
+    {
+        // momentary: on while held, back to the previous state when released
+        if (pressed && f->stopped())
+        {
+            st.flashStarted = true;
+            f->requestAttributeOverride(Function::Intensity, 1.0);
+            startFunction(f, parent, 1.0);
+        }
+        else if (!pressed && st.flashStarted)
+        {
+            stopFunction(f, parent);
+            st.flashStarted = false;
+        }
+        slotRefresh();
+        return;
+    }
+
+    if (pressed == false)
+        return;
+
     if (f->isRunning())
     {
         stopFunction(f, parent);
@@ -516,6 +545,116 @@ void PlaybackManager::assignExec(int index, quint32 functionId)
 
     st = ExecState();
     st.functionId = functionAt(functionId) ? functionId : Function::invalidId();
+    m_doc->setModified();
+    slotRefresh();
+}
+
+void PlaybackManager::setExecFlashMode(int index, bool flash)
+{
+    if (index < 0 || index >= ExecCount)
+        return;
+    ExecState &st = exec(m_page, index);
+    if (st.flashMode == flash)
+        return;
+    st.flashMode = flash;
+    st.flashStarted = false;
+    m_doc->setModified();
+    slotRefresh();
+}
+
+void PlaybackManager::setFaderLabel(int index, const QString &label)
+{
+    if (index < 0 || index >= FaderCount)
+        return;
+    fader(m_page, index).label = label.trimmed();
+    m_doc->setModified();
+    slotRefresh();
+}
+
+void PlaybackManager::setFaderColor(int index, const QString &color)
+{
+    if (index < 0 || index >= FaderCount)
+        return;
+    fader(m_page, index).color = color;
+    m_doc->setModified();
+    slotRefresh();
+}
+
+void PlaybackManager::setExecLabel(int index, const QString &label)
+{
+    if (index < 0 || index >= ExecCount)
+        return;
+    exec(m_page, index).label = label.trimmed();
+    m_doc->setModified();
+    slotRefresh();
+}
+
+void PlaybackManager::setExecColor(int index, const QString &color)
+{
+    if (index < 0 || index >= ExecCount)
+        return;
+    exec(m_page, index).color = color;
+    m_doc->setModified();
+    slotRefresh();
+}
+
+void PlaybackManager::moveFader(int from, int to)
+{
+    if (from < 0 || from >= FaderCount || to < 0 || to >= FaderCount || from == to)
+        return;
+    // a running playback keeps running: only its slot (and parent id) changes
+    FaderState &a = fader(m_page, from);
+    FaderState &b = fader(m_page, to);
+    Function *fa = functionAt(a.functionId), *fb = functionAt(b.functionId);
+    if (fa && a.owned) stopFunction(fa, parentId(true, m_page, from));
+    if (fb && b.owned) stopFunction(fb, parentId(true, m_page, to));
+    std::swap(a, b);
+    a.owned = b.owned = false;
+    a.attributeId = b.attributeId = -1;
+    a.level = b.level = 0;
+    m_doc->setModified();
+    slotRefresh();
+}
+
+void PlaybackManager::moveExec(int from, int to)
+{
+    if (from < 0 || from >= ExecCount || to < 0 || to >= ExecCount || from == to)
+        return;
+    std::swap(exec(m_page, from), exec(m_page, to));
+    exec(m_page, from).flashStarted = false;
+    exec(m_page, to).flashStarted = false;
+    m_doc->setModified();
+    slotRefresh();
+}
+
+bool PlaybackManager::assignToFree(quint32 functionId)
+{
+    if (functionAt(functionId) == nullptr)
+        return false;
+    for (int i = 0; i < FaderCount; i++)
+    {
+        if (functionAt(fader(m_page, i).functionId) == nullptr)
+        {
+            assignFader(i, functionId);
+            return true;
+        }
+    }
+    for (int i = 0; i < ExecCount; i++)
+    {
+        if (functionAt(exec(m_page, i).functionId) == nullptr)
+        {
+            assignExec(i, functionId);
+            return true;
+        }
+    }
+    return false;
+}
+
+void PlaybackManager::setPageName(int page, const QString &name)
+{
+    if (page < 0 || page >= PageCount)
+        return;
+    m_pageNames[page] = name.trimmed();
     m_doc->setModified();
     slotRefresh();
 }
@@ -550,6 +689,10 @@ void PlaybackManager::slotRefresh()
         const FaderState &st = fader(m_page, i);
         Function *f = functionAt(st.functionId);
         QVariantMap map = describe(st.functionId, f && f->isRunning() && st.owned);
+        map.insert("name", map.value("label"));
+        if (f && !st.label.isEmpty())
+            map.insert("label", st.label);
+        map.insert("color", f ? st.color : QString());
         map.insert("level", st.level);
         map.insert("pickup", st.needsPickup);
         map.insert("flashing", st.flashing);
@@ -564,8 +707,15 @@ void PlaybackManager::slotRefresh()
     QVariantList execs;
     for (int i = 0; i < ExecCount; i++)
     {
-        Function *f = functionAt(exec(m_page, i).functionId);
-        execs.append(describe(exec(m_page, i).functionId, f && f->isRunning()));
+        const ExecState &st = exec(m_page, i);
+        Function *f = functionAt(st.functionId);
+        QVariantMap map = describe(st.functionId, f && f->isRunning());
+        map.insert("name", map.value("label"));
+        if (f && !st.label.isEmpty())
+            map.insert("label", st.label);
+        map.insert("color", f ? st.color : QString());
+        map.insert("flashMode", st.flashMode);
+        execs.append(map);
     }
     if (execs != m_execsCache)
     {
@@ -592,6 +742,7 @@ void PlaybackManager::slotRefresh()
         QVariantMap map;
         map.insert("used", used);
         map.insert("running", running);
+        map.insert("name", m_pageNames.at(p));
         pages.append(map);
     }
     if (pages != m_pagesCache)
@@ -878,6 +1029,9 @@ void PlaybackManager::resetContents()
 {
     m_faders = QVector<FaderState>(PageCount * FaderCount);
     m_execs = QVector<ExecState>(PageCount * ExecCount);
+    m_pageNames = QStringList();
+    for (int p = 0; p < PageCount; p++)
+        m_pageNames.append(QString());
     m_page = 0;
     m_armedFunction = Function::invalidId();
     m_autoPatchDone = false;
@@ -905,6 +1059,8 @@ bool PlaybackManager::loadXML(QXmlStreamReader &root)
         }
 
         int page = root.attributes().value(KXMLQLCPlaybacksIndex).toInt();
+        if (page >= 0 && page < PageCount)
+            m_pageNames[page] = root.attributes().value(KXMLQLCPlaybacksName).toString();
         while (root.readNextStartElement())
         {
             QXmlStreamAttributes attrs = root.attributes();
@@ -913,10 +1069,23 @@ bool PlaybackManager::loadXML(QXmlStreamReader &root)
 
             if (page >= 0 && page < PageCount)
             {
+                QString label = attrs.value(KXMLQLCPlaybacksLabel).toString();
+                QString color = attrs.value(KXMLQLCPlaybacksColor).toString();
                 if (root.name() == KXMLQLCPlaybacksFader && index >= 0 && index < FaderCount)
-                    fader(page, index).functionId = fid;
+                {
+                    FaderState &st = fader(page, index);
+                    st.functionId = fid;
+                    st.label = label;
+                    st.color = color;
+                }
                 else if (root.name() == KXMLQLCPlaybacksExec && index >= 0 && index < ExecCount)
-                    exec(page, index).functionId = fid;
+                {
+                    ExecState &st = exec(page, index);
+                    st.functionId = fid;
+                    st.label = label;
+                    st.color = color;
+                    st.flashMode = attrs.value(KXMLQLCPlaybacksMode) == KXMLQLCPlaybacksFlash;
+                }
             }
             root.skipCurrentElement();
         }
@@ -939,29 +1108,45 @@ bool PlaybackManager::saveXML(QXmlStreamWriter *doc) const
                 return;
             doc->writeStartElement(KXMLQLCPlaybacksPage);
             doc->writeAttribute(KXMLQLCPlaybacksIndex, QString::number(p));
+            if (!m_pageNames.at(p).isEmpty())
+                doc->writeAttribute(KXMLQLCPlaybacksName, m_pageNames.at(p));
             pageOpen = true;
         };
+        if (!m_pageNames.at(p).isEmpty())
+            openPage();
 
         for (int i = 0; i < FaderCount; i++)
         {
-            quint32 fid = m_faders.at(p * FaderCount + i).functionId;
+            const FaderState &st = m_faders.at(p * FaderCount + i);
+            quint32 fid = st.functionId;
             if (functionAt(fid) == nullptr)
                 continue;
             openPage();
             doc->writeStartElement(KXMLQLCPlaybacksFader);
             doc->writeAttribute(KXMLQLCPlaybacksIndex, QString::number(i));
             doc->writeAttribute(KXMLQLCPlaybacksFunction, QString::number(fid));
+            if (!st.label.isEmpty())
+                doc->writeAttribute(KXMLQLCPlaybacksLabel, st.label);
+            if (!st.color.isEmpty())
+                doc->writeAttribute(KXMLQLCPlaybacksColor, st.color);
             doc->writeEndElement();
         }
         for (int i = 0; i < ExecCount; i++)
         {
-            quint32 fid = m_execs.at(p * ExecCount + i).functionId;
+            const ExecState &st = m_execs.at(p * ExecCount + i);
+            quint32 fid = st.functionId;
             if (functionAt(fid) == nullptr)
                 continue;
             openPage();
             doc->writeStartElement(KXMLQLCPlaybacksExec);
             doc->writeAttribute(KXMLQLCPlaybacksIndex, QString::number(i));
             doc->writeAttribute(KXMLQLCPlaybacksFunction, QString::number(fid));
+            if (!st.label.isEmpty())
+                doc->writeAttribute(KXMLQLCPlaybacksLabel, st.label);
+            if (!st.color.isEmpty())
+                doc->writeAttribute(KXMLQLCPlaybacksColor, st.color);
+            if (st.flashMode)
+                doc->writeAttribute(KXMLQLCPlaybacksMode, KXMLQLCPlaybacksFlash);
             doc->writeEndElement();
         }
 

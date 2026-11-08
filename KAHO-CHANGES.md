@@ -24,6 +24,19 @@ the fork changes. All original copyright notices are kept.
   `resources/fonts/NunitoRounded.ttf`, renamed instance of Nunito ExtraBold,
   license in `resources/fonts/OFL-Nunito.txt`), window title "KAHO Console",
   About box mentions the fork and keeps the QLC+ credits.
+- **Playbacks, second pass**: custom name and color per playback / execute
+  button, named pages, execute buttons in toggle or momentary FLASH mode,
+  drag & drop from a searchable, type-filtered function list (double-click =
+  first free slot), slot options on right click (rename, color, move, remove),
+  keyboard shortcuts (1-8 GO, Ctrl+1-8 release, Alt+1-8 flash, Page Up/Down),
+  running slots filled with their color. Saved as `Name`, `Label`, `Color`
+  and `Mode` attributes of the `<Playbacks>` element.
+- **CLEAR key** in the status bar: shows how many channels the Simple Desk is
+  holding over the cue stack and releases them all (`SimpleDesk::resetAll()`,
+  `overrideCount` property added to `qmlui/simpledesk.*`). Grand Master
+  warning (level / flashing BLACKOUT) next to it. Simple Desk held channels
+  use a soft tint and a red marker instead of a solid red strip
+  (`qmlui/qml/SimpleDesk.qml`).
 - **Console layout**: slim status bar on top (KAHO wordmark opening the
   Actions menu, current window, clock, BPM), big window keys at the bottom
   (`qmlui/qml/ConsoleWindowKey.qml`) with F1-F6 shortcuts, instead of the

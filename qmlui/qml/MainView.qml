@@ -271,6 +271,112 @@ Rectangle
                 color: "transparent"
             }
 
+            // ################## GRAND MASTER WARNING ##################
+            Rectangle
+            {
+                id: gmWarning
+                visible: playbackManager.grandMaster < 0.995
+                Layout.alignment: Qt.AlignVCenter
+                Layout.rightMargin: UISettings.textSizeDefault * 0.5
+                implicitHeight: mainToolbar.height * 0.7
+                implicitWidth: gmText.implicitWidth + implicitHeight
+                radius: implicitHeight / 2
+                readonly property bool blackout: playbackManager.grandMaster < 0.005
+                color: blackout ? UISettings.consoleRelease : "transparent"
+                border.width: 1
+                border.color: UISettings.consoleRelease
+
+                SequentialAnimation on opacity
+                {
+                    running: gmWarning.visible && gmWarning.blackout
+                    loops: Animation.Infinite
+                    onRunningChanged: if (!running) gmWarning.opacity = 1
+                    NumberAnimation { to: 0.35; duration: 450 }
+                    NumberAnimation { to: 1; duration: 450 }
+                }
+
+                Text
+                {
+                    id: gmText
+                    anchors.centerIn: parent
+                    text: gmWarning.blackout ? qsTr("BLACKOUT") : "GM " + Math.round(playbackManager.grandMaster * 100) + "%"
+                    color: gmWarning.blackout ? UISettings.bgStronger : UISettings.consoleRelease
+                    font.family: UISettings.titleFontName
+                    font.pixelSize: mainToolbar.height * 0.32
+                    font.letterSpacing: 1
+                }
+                MouseArea
+                {
+                    anchors.fill: parent
+                    onClicked: playbackManager.grandMaster = 1
+                    ToolTip.visible: containsMouse
+                    ToolTip.text: qsTr("Grand Master baissé · clic pour remettre à 100 %")
+                    hoverEnabled: true
+                }
+            }
+
+            // ################## CLEAR (programmer) ##################
+            Rectangle
+            {
+                id: clearKey
+                Layout.alignment: Qt.AlignVCenter
+                Layout.rightMargin: UISettings.textSizeDefault
+                implicitHeight: mainToolbar.height * 0.7
+                implicitWidth: clearRow.implicitWidth + implicitHeight * 0.9
+                radius: implicitHeight * 0.25
+                readonly property int held: simpleDesk ? simpleDesk.overrideCount : 0
+                color: held > 0 ? (clearArea.pressed ? Qt.lighter(UISettings.consoleRelease, 1.2) : UISettings.consoleRelease)
+                                : "transparent"
+                border.width: 1
+                border.color: held > 0 ? UISettings.consoleRelease : UISettings.bgControl
+                opacity: held > 0 ? 1 : 0.55
+
+                Row
+                {
+                    id: clearRow
+                    anchors.centerIn: parent
+                    spacing: clearKey.implicitHeight * 0.25
+                    Text
+                    {
+                        text: qsTr("CLEAR")
+                        color: clearKey.held > 0 ? UISettings.bgStronger : UISettings.fgMedium
+                        font.family: UISettings.titleFontName
+                        font.pixelSize: mainToolbar.height * 0.32
+                        font.letterSpacing: 1
+                    }
+                    Rectangle
+                    {
+                        visible: clearKey.held > 0
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: clearKey.implicitHeight * 0.62
+                        width: Math.max(height, countText.implicitWidth + height * 0.5)
+                        radius: height / 2
+                        color: UISettings.bgStronger
+                        Text
+                        {
+                            id: countText
+                            anchors.centerIn: parent
+                            text: clearKey.held
+                            color: UISettings.consoleRelease
+                            font.family: UISettings.robotoFontName
+                            font.pixelSize: parent.height * 0.62
+                            font.bold: true
+                        }
+                    }
+                }
+                MouseArea
+                {
+                    id: clearArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    enabled: clearKey.held > 0
+                    onClicked: simpleDesk.resetAll()
+                    ToolTip.visible: containsMouse
+                    ToolTip.delay: 400
+                    ToolTip.text: qsTr("%1 canaux tenus par le pupitre simple (en rouge) passent avant les scènes. CLEAR les relâche.").arg(clearKey.held)
+                }
+            }
+
             // ################## CLOCK ##################
             Text
             {

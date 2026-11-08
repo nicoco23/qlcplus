@@ -42,6 +42,8 @@ class SimpleDesk final : public PreviewContext, public DMXSource
     Q_PROPERTY(quint32 dumpChannelMask READ dumpChannelMask NOTIFY dumpChannelMaskChanged)
     Q_PROPERTY(QVariantList fixtureList READ fixtureList NOTIFY fixtureListChanged)
     Q_PROPERTY(QStringList commandHistory READ commandHistory NOTIFY commandHistoryChanged)
+    /** KAHO: number of channels currently overridden (held) by the Simple Desk */
+    Q_PROPERTY(int overrideCount READ overrideCount NOTIFY overrideCountChanged)
 
 public:
     SimpleDesk(QQuickView *view, Doc *doc,
@@ -107,6 +109,12 @@ public:
     /** Reset the value of the specified channel */
     Q_INVOKABLE void resetChannel(uint channel);
 
+    /** KAHO: release every channel held by the Simple Desk, on all universes
+     *  (the console "CLEAR" key) */
+    Q_INVOKABLE void resetAll();
+
+    int overrideCount() const;
+
     /** Web access helpers (absolute address based) */
     int getSlidersNumber() const;
     int getCurrentUniverseIndex() const;
@@ -125,6 +133,7 @@ signals:
     /** Informed the listeners that a channel value has changed.
      *  This is connected to ContextManager for Scene dump */
     void channelValueChanged(quint32 fixtureID, quint32 channelIndex, quint8 value);
+    void overrideCountChanged();
 
 private:
     /** A map of channel absolute addresses and their values.

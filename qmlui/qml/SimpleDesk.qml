@@ -191,7 +191,8 @@ Rectangle
                         color: {
                             if (isOverride)
                             {
-                                return "red"
+                                // KAHO: soft programmer tint instead of a solid red strip
+                                return Qt.rgba(UISettings.consoleRelease.r, UISettings.consoleRelease.g, UISettings.consoleRelease.b, 0.2)
                             }
                             else
                             {
@@ -209,6 +210,15 @@ Rectangle
                         property Fixture fixtureObj: model.cRef
                         property int chDisplay: model.chDisplay
                         property bool isOverride: model.isOverride
+
+                        // KAHO: "held by the desk" marker
+                        Rectangle
+                        {
+                            visible: chRoot.isOverride
+                            width: parent.width
+                            height: 3
+                            color: UISettings.consoleRelease
+                        }
 
                         ColumnLayout
                         {
@@ -287,7 +297,7 @@ Rectangle
                                 // Item.focusPolicy exists only from Qt 6.7
                                 Component.onCompleted: if ("focusPolicy" in this) focusPolicy = Qt.NoFocus
                                 fontSize: UISettings.textSizeDefault
-                                labelColor: UISettings.fgMain
+                                labelColor: chRoot.isOverride ? UISettings.consoleRelease : UISettings.fgMain
                                 fontBold: true
                                 label: index + 1
                             }
@@ -296,7 +306,7 @@ Rectangle
                             IconButton
                             {
                                 faSource: FontAwesome.fa_xmark
-                                faColor: UISettings.bgControl
+                                faColor: chRoot.isOverride ? UISettings.consoleRelease : UISettings.bgControl
                                 tooltip: qsTr("Reset the channel")
                                 focusPolicy: Qt.NoFocus
                                 onClicked:

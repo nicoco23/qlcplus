@@ -18,6 +18,7 @@
 */
 
 #include <QQmlContext>
+#include <QSet>
 
 #include "simpledesk.h"
 #include "keypadparser.h"
@@ -211,6 +212,7 @@ QVariant SimpleDesk::universesListModel() const
 
 void SimpleDesk::setValue(quint32 fixtureID, uint channel, uchar value)
 {
+    QMetaObject::invokeMethod(this, &SimpleDesk::overrideCountChanged, Qt::QueuedConnection);
     QMutexLocker locker(&m_mutex);
     quint32 start = (m_universeFilter * 512);
     QVariant currentVal, newVal;
@@ -271,8 +273,27 @@ bool SimpleDesk::hasChannel(uint channel)
     return m_values.contains(start + channel);
 }
 
+int SimpleDesk::overrideCount() const
+{
+    QMutexLocker locker(&m_mutex);
+    return int(m_values.count());
+}
+
+void SimpleDesk::resetAll()
+{
+    QSet<int> universes;
+    {
+        QMutexLocker locker(&m_mutex);
+        for (auto it = m_values.cbegin(); it != m_values.cend(); ++it)
+            universes.insert(int(it.key() >> 9));
+    }
+    for (int universe : universes)
+        resetUniverse(universe);
+}
+
 void SimpleDesk::resetUniverse(int universe)
 {
+    QMetaObject::invokeMethod(this, &SimpleDesk::overrideCountChanged, Qt::QueuedConnection);
     // remove values previously set on universe
     QMutexLocker locker(&m_mutex);
     QVariantList oldValues;
@@ -305,6 +326,7 @@ void SimpleDesk::resetUniverse(int universe)
 
 void SimpleDesk::resetChannel(uint channel)
 {
+    QMetaObject::invokeMethod(this, &SimpleDesk::overrideCountChanged, Qt::QueuedConnection);
     QMutexLocker locker(&m_mutex);
     quint32 start = (m_universeFilter * 512);
     QVariant currentVal;
@@ -374,6 +396,7 @@ bool SimpleDesk::isChannelOverridden(uint address) const
 
 void SimpleDesk::setAbsoluteChannelValue(uint address, uchar value)
 {
+    QMetaObject::invokeMethod(this, &SimpleDesk::overrideCountChanged, Qt::QueuedConnection);
     if (address >= (m_doc->inputOutputMap()->universesCount() * 512))
         return;
 
@@ -394,6 +417,7 @@ void SimpleDesk::setAbsoluteChannelValue(uint address, uchar value)
 
 void SimpleDesk::resetAbsoluteChannel(uint address)
 {
+    QMetaObject::invokeMethod(this, &SimpleDesk::overrideCountChanged, Qt::QueuedConnection);
     QMutexLocker locker(&m_mutex);
     if (m_values.contains(address) == false)
         return;
