@@ -768,6 +768,8 @@ void App::clearDocument()
     m_virtualConsole->resetContents();
     if (m_playbackManager)
         m_playbackManager->resetContents();
+    if (m_programmerManager)
+        m_programmerManager->resetContents();
 
     // Drop the preview items *before* the Doc is emptied: they hold references
     // to fixtures that clearContents() is about to delete
@@ -1239,6 +1241,10 @@ bool App::loadXML(QXmlStreamReader &doc, bool goToConsole, bool fromMemory)
         {
             m_playbackManager->loadXML(doc);
         }
+        else if (doc.name() == KXMLQLCProgrammer)
+        {
+            m_programmerManager->loadXML(doc);
+        }
 #if 0
         else if (doc.name() == KXMLQLCSimpleDesk)
         {
@@ -1324,6 +1330,9 @@ QFile::FileError App::saveXML(const QString& fileName, bool autosave)
 
     /* Write the playback pages */
     m_playbackManager->saveXML(&doc);
+
+    /* Write the programmer memories */
+    m_programmerManager->saveXML(&doc);
 
     /* Write Simple Desk to the XML document */
     //SimpleDesk::instance()->saveXML(&doc);

@@ -105,8 +105,8 @@ SidePanel
             {
                 faSource: checked ? FontAwesome.fa_eye_slash : FontAwesome.fa_eye
                 faColor: UISettings.fgMain
-                bgColor: "green"
-                checkedColor: "red"
+                bgColor: Qt.darker(UISettings.consoleGo, 1.6)
+                checkedColor: UISettings.consoleRelease
                 checkable: true
                 checked: ioManager.blackout
                 tooltip: qsTr("Enable/Disable blackout on all the output patches")

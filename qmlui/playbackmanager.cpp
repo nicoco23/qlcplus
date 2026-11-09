@@ -262,6 +262,8 @@ void PlaybackManager::setArmedFunction(quint32 id)
     if (id == m_armedFunction)
         return;
     m_armedFunction = id;
+    if (id != Function::invalidId())
+        setPickMode(QString());
     emit armedFunctionChanged();
 }
 
@@ -656,6 +658,62 @@ void PlaybackManager::setPageName(int page, const QString &name)
         return;
     m_pageNames[page] = name.trimmed();
     m_doc->setModified();
+    slotRefresh();
+}
+
+QString PlaybackManager::pickMode() const
+{
+    return m_pickMode;
+}
+
+void PlaybackManager::setPickMode(const QString &mode)
+{
+    if (mode == m_pickMode)
+        return;
+    m_pickMode = mode;
+    if (mode.isEmpty() == false)
+        setArmedFunction(Function::invalidId());
+    emit pickModeChanged();
+}
+
+void PlaybackManager::pickSlot(bool isFader, int index)
+{
+    QString mode = m_pickMode;
+    if (mode.isEmpty())
+        return;
+    setPickMode(QString());
+    emit slotPicked(mode, isFader, index, slotFunction(isFader, index));
+}
+
+quint32 PlaybackManager::slotFunction(bool isFader, int index)
+{
+    if (isFader)
+        return (index >= 0 && index < FaderCount) ? fader(m_page, index).functionId : Function::invalidId();
+    return (index >= 0 && index < ExecCount) ? exec(m_page, index).functionId : Function::invalidId();
+}
+
+void PlaybackManager::replaceSlotFunction(bool isFader, int index, quint32 functionId)
+{
+    QString label, color;
+    bool flashMode = false;
+    if (isFader && index >= 0 && index < FaderCount)
+    {
+        label = fader(m_page, index).label;
+        color = fader(m_page, index).color;
+        assignFader(index, functionId);
+        fader(m_page, index).label = label;
+        fader(m_page, index).color = color;
+    }
+    else if (!isFader && index >= 0 && index < ExecCount)
+    {
+        label = exec(m_page, index).label;
+        color = exec(m_page, index).color;
+        flashMode = exec(m_page, index).flashMode;
+        assignExec(index, functionId);
+        exec(m_page, index).label = label;
+        exec(m_page, index).color = color;
+        exec(m_page, index).flashMode = flashMode;
+    }
     slotRefresh();
 }
 

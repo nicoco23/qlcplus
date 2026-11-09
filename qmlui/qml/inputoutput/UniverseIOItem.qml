@@ -226,7 +226,7 @@ Rectangle
             {
                 var vCenter = (height / 2) - 4
                 var wireMargin = width / 20
-                context.strokeStyle = "yellow"
+                context.strokeStyle = UISettings.kahoMauve
                 context.lineWidth = 3
                 context.beginPath()
                 context.clearRect(0, 0, width, height)
@@ -264,7 +264,7 @@ Rectangle
             anchors.bottom: parent.bottom
             width: UISettings.iconSizeMedium * 0.8
             height: UISettings.iconSizeMedium * 0.8
-            checkedColor: "green"
+            checkedColor: UISettings.consoleGo
             imgSource: ""
             checkable: true
             checked: universe ? universe.hasFeedback : false

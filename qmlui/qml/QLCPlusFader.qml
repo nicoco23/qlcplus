@@ -38,59 +38,66 @@ Slider
     property color trackColor: defaultTrackColor
     property real scaleFactor: 1.0
 
-    property color defaultTrackColor: "#38b0ff"
+    property color defaultTrackColor: UISettings.kahoMauve
+    /* kept for compatibility (Virtual Console sliders set them): the KAHO cap ignores the gradients */
     property Gradient defaultGradient:
         Gradient
         {
-            GradientStop { position: 0; color: "#ccc" }
-            GradientStop { position: 0.45; color: "#555" }
-            GradientStop { position: 0.50; color: "#000" }
-            GradientStop { position: 0.55; color: "#555" }
-            GradientStop { position: 1.0; color: "#888" }
+            GradientStop { position: 0; color: UISettings.bgControl }
+            GradientStop { position: 1; color: UISettings.bgControl }
         }
 
     property Gradient defaultGradientHover:
         Gradient
         {
-            GradientStop { position: 0; color: "#eee" }
-            GradientStop { position: 0.45; color: "#999" }
-            GradientStop { position: 0.50; color: "red" }
-            GradientStop { position: 0.55; color: "#999" }
-            GradientStop { position: 1.0; color: "#ccc" }
+            GradientStop { position: 0; color: UISettings.bgLight }
+            GradientStop { position: 1; color: UISettings.bgLight }
         }
 
+    /* KAHO console fader: dark slot, level filled from the bottom, flat cap with a lit line */
     background:
         Rectangle
         {
-            y: slider.leftPadding
-            x: slider.topPadding + slider.availableWidth / 2 - width / 2
-            //implicitWidth: 5
+            y: slider.topPadding
+            x: slider.leftPadding + slider.availableWidth / 2 - width / 2
             implicitHeight: slider.height
-            width: 5
+            width: Math.max(5, Math.min(9, slider.availableWidth * 0.18))
             height: slider.availableHeight
-            radius: 2
-            color: trackColor
+            radius: width / 2
+            color: UISettings.bgStronger
+            border.color: UISettings.borderColorDark
 
             Rectangle
             {
+                anchors.bottom: parent.bottom
                 width: parent.width
-                height: slider.visualPosition * parent.height
-                color: "#bdbebf"
-                radius: 2
+                height: (1.0 - slider.visualPosition) * parent.height
+                radius: parent.radius
+                color: slider.trackColor
+                opacity: slider.enabled ? 1 : 0.4
             }
         }
 
     handle:
         Rectangle
         {
-            y: slider.leftPadding + slider.visualPosition * (slider.availableHeight - height)
-            x: slider.topPadding + slider.availableWidth / 2 - width / 2
+            y: slider.topPadding + slider.visualPosition * (slider.availableHeight - height)
+            x: slider.leftPadding + slider.availableWidth / 2 - width / 2
             // shrink to fit the available width, up to the default size
             implicitWidth: Math.min(UISettings.iconSizeDefault * slider.scaleFactor, slider.width)
-            implicitHeight: implicitWidth * 0.75
-            gradient: pressed ? handleGradientHover : handleGradient
-            border.color: "#5c5c5c"
-            border.width: 1
+            implicitHeight: implicitWidth * 0.5
             radius: 4
+            color: slider.pressed ? UISettings.bgLight : (slider.hovered ? UISettings.bgLight : UISettings.bgControl)
+            border.color: slider.pressed ? UISettings.kahoMauve : UISettings.bgLighter
+            border.width: 1
+
+            Rectangle
+            {
+                anchors.centerIn: parent
+                width: parent.width * 0.7
+                height: Math.max(2, parent.height * 0.12)
+                radius: height / 2
+                color: slider.pressed ? UISettings.kahoMauve : UISettings.fgLight
+            }
         }
 }

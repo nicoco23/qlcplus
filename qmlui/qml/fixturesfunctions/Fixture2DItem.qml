@@ -33,7 +33,7 @@ Rectangle
     width: (gridCellSize * mmWidth) / gridUnits
     height: (gridCellSize * mmHeight) / gridUnits
 
-    color: "#2A2A2A"
+    color: UISettings.bgMedium
     border.width: isSelected ? 2 : 1
     border.color: isSelected ? UISettings.selection : UISettings.fgLight
 
@@ -200,7 +200,7 @@ Rectangle
                     color: "black"
                     radius: fixtureItem.headSide / 2
                     border.width: 1
-                    border.color: "#AAA"
+                    border.color: UISettings.bgLighter
 
                     function setShutter(type, low, high)
                     {
@@ -260,13 +260,13 @@ Rectangle
             if (tiltMaxDegrees)
             {
                 // draw TILT curve
-                context.strokeStyle = "#2E77FF";
+                context.strokeStyle = UISettings.kahoMauve;
                 DrawFuncs.drawEllipse(context, width / 2, height / 2, tiltWidth, height)
             }
             if (panMaxDegrees)
             {
                 // draw PAN curve
-                context.strokeStyle = "#19438F"
+                context.strokeStyle = UISettings.kahoMauveDeep
                 DrawFuncs.drawEllipse(context, width / 2, height / 2, width, panHeight)
             }
 
@@ -295,7 +295,7 @@ Rectangle
         x: -10
         width: parent.width + 20
         height: UISettings.listItemHeight
-        color: "#444"
+        color: UISettings.bgControl
         visible: showLabel
         // keep the text readable when the fixture is upside down
         rotation: Math.abs(((fixtureItem.rotation % 360) + 360) % 360 - 180) < 90 ? 180 : 0

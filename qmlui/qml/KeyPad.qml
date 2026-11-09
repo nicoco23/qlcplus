@@ -60,7 +60,7 @@ Rectangle
         onTriggered:
         {
             if (tapButton.border.color == UISettings.bgMedium)
-                tapButton.border.color = "#00FF00"
+                tapButton.border.color = UISettings.kahoMauve
             else
                 tapButton.border.color = UISettings.bgMedium
         }
@@ -277,9 +277,9 @@ Rectangle
             Layout.fillWidth: true
             implicitHeight: itemHeight
             label: "ENTER"
-            bgColor: "#43B008"
-            hoverColor: "#61FF0C"
-            pressedColor: "#225B04"
+            bgColor: Qt.darker(UISettings.consoleGo, 1.6)
+            hoverColor: UISettings.consoleGo
+            pressedColor: Qt.darker(UISettings.consoleGo, 2.4)
             onClicked: keyPadRoot.executeCommand(keyPadRoot.commandString)
         }
         GenericButton

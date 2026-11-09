@@ -41,7 +41,7 @@ Rectangle
         height: parent.height
         z: 1
         radius: 3
-        color: UISettings.bgLighter
+        color: UISettings.bgControl
         border.width: 2
         border.color: UISettings.borderColorDark
 
@@ -60,8 +60,8 @@ Rectangle
                 {
                     faSource: checked ? FontAwesome.fa_pause : FontAwesome.fa_play
                     faColor: UISettings.fgMain
-                    bgColor: "green"
-                    checkedColor: "red"
+                    bgColor: Qt.darker(UISettings.consoleGo, 1.6)
+                    checkedColor: UISettings.consoleRelease
                     checkable: true
                     checked: patch ? patch.paused : false
                     tooltip: qsTr("Play/Pause this output patch")
@@ -71,8 +71,8 @@ Rectangle
                 {
                     faSource: checked ? FontAwesome.fa_eye_slash : FontAwesome.fa_eye
                     faColor: UISettings.fgMain
-                    bgColor: "green"
-                    checkedColor: "red"
+                    bgColor: Qt.darker(UISettings.consoleGo, 1.6)
+                    checkedColor: UISettings.consoleRelease
                     checkable: true
                     checked: patch ? patch.blackout : false
                     tooltip: qsTr("Enable/Disable a blackout on this output patch")
@@ -94,7 +94,7 @@ Rectangle
                 height: patchBox.height
                 Layout.fillWidth: true
                 label: patch ? patch.outputName : ""
-                labelColor: "black"
+                labelColor: UISettings.fgMain
                 wrapText: true
                 fontSize: UISettings.textSizeDefault
             }

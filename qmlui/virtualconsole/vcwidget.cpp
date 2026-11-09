@@ -40,7 +40,7 @@ VCWidget::VCWidget(Doc *doc, QObject *parent)
     , m_isDisabled(false)
     , m_isVisible(true)
     , m_caption(QString())
-    , m_backgroundColor(QColor("#333"))
+    , m_backgroundColor(QColor("#1b1a21"))  // KAHO: bgMedium
     , m_hasCustomBackgroundColor(false)
     , m_backgroundImage(QString())
     , m_foregroundColor(QColor(Qt::white))
@@ -428,7 +428,7 @@ bool VCWidget::hasCustomBackgroundColor() const
 void VCWidget::resetBackgroundColor()
 {
     m_hasCustomBackgroundColor = false;
-    m_backgroundColor =QColor("#333");
+    m_backgroundColor = QColor("#1b1a21");  // KAHO: bgMedium
     setDocModified();
     emit backgroundColorChanged(m_backgroundColor);
 }

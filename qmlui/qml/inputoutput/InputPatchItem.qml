@@ -47,7 +47,7 @@ Rectangle
 
         border.width: 2
         border.color: UISettings.borderColorDark
-        color: "#269ABA"
+        color: UISettings.typeChaser
         radius: 10
 
         IconButton
@@ -69,7 +69,7 @@ Rectangle
             height: UISettings.bigItemHeight * 0.3
             width: parent.width - 20
             label: patch ? patch.profileName : ""
-            labelColor: "black"
+            labelColor: UISettings.fgMain
             fontSize: UISettings.textSizeDefault
         }
     }
@@ -83,7 +83,7 @@ Rectangle
         x: profileBox.visible ? 5 : 0
         z: 1
         radius: 3
-        color: UISettings.bgLighter
+        color: UISettings.bgControl
         border.width: 2
         border.color: UISettings.borderColorDark
 
@@ -141,7 +141,7 @@ Rectangle
                 height: ipRoot.height
                 Layout.fillWidth: true
                 label: patch ? patch.inputName : ""
-                labelColor: "black"
+                labelColor: UISettings.fgMain
                 wrapText: true
                 fontSize: UISettings.textSizeDefault
             }

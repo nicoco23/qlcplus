@@ -58,6 +58,7 @@ class PlaybackManager final : public PreviewContext
     Q_PROPERTY(bool controllerFeedback READ controllerFeedback NOTIFY controllerChanged)
     Q_PROPERTY(QVariantList functionsList READ functionsList NOTIFY functionsListChanged)
     Q_PROPERTY(quint32 armedFunction READ armedFunction WRITE setArmedFunction NOTIFY armedFunctionChanged)
+    Q_PROPERTY(QString pickMode READ pickMode WRITE setPickMode NOTIFY pickModeChanged)
 
 public:
     static const int PageCount = 8;      // one per APC mini scene button
@@ -121,6 +122,17 @@ public:
 
     Q_INVOKABLE void setPageName(int page, const QString &name);
 
+    /** "Pick" mode, used by the programmer: the next slot clicked is reported
+     *  with slotPicked() instead of being assigned ("" = off) */
+    QString pickMode() const;
+    void setPickMode(const QString &mode);
+    Q_INVOKABLE void pickSlot(bool isFader, int index);
+
+    /** Function held by a slot of the current page */
+    quint32 slotFunction(bool isFader, int index);
+    /** Put another function on a slot, keeping its name and colour */
+    void replaceSlotFunction(bool isFader, int index, quint32 functionId);
+
     /** Release every playback and execute started from here */
     Q_INVOKABLE void releaseAll();
 
@@ -137,6 +149,8 @@ signals:
     void controllerChanged();
     void functionsListChanged();
     void armedFunctionChanged();
+    void pickModeChanged();
+    void slotPicked(QString mode, bool isFader, int index, quint32 functionId);
 
 private slots:
     void slotRefresh();
@@ -190,6 +204,7 @@ private:
     QVector<ExecState> m_execs;     // PageCount * ExecCount
     QStringList m_pageNames;        // PageCount
     quint32 m_armedFunction;
+    QString m_pickMode;
 
     QVariantList m_fadersCache;
     QVariantList m_execsCache;

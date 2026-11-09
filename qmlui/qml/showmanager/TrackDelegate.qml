@@ -29,7 +29,7 @@ Rectangle
     height: UISettings.mediumItemHeight
     clip: true
 
-    color: isSelected ? UISettings.highlight : "#313F4A"
+    color: isSelected ? UISettings.kahoMauveDeep : UISettings.bgMedium
 
     property Track trackRef: null
     property bool isSelected: false
@@ -58,7 +58,7 @@ Rectangle
         width: parent.width
         height: 2
         y: parent.height - 2
-        color: "#263039"
+        color: UISettings.bgStrong
     }
 
     IconButton
@@ -69,8 +69,8 @@ Rectangle
         z: 2
         width: parent.width / 6
         height: parent.height * 0.3
-        bgColor: "#8191A0"
-        checkedColor: "yellow"
+        bgColor: UISettings.bgControl
+        checkedColor: "#ffe066"
         imgSource: ""
         checkable: true
         tooltip: qsTr("Solo this track")
@@ -81,7 +81,7 @@ Rectangle
             anchors.centerIn: parent
             height: parent.height - 2
             label: "S"
-            labelColor: "#3C4A55"
+            labelColor: UISettings.fgMain
             fontSize: height - 2
             fontBold: true
         }
@@ -95,8 +95,8 @@ Rectangle
         z: 2
         width: parent.width / 6
         height: parent.height * 0.3
-        bgColor: "#8191A0"
-        checkedColor: "red"
+        bgColor: UISettings.bgControl
+        checkedColor: UISettings.consoleRelease
         checked: trackRef ? trackRef.mute : false
         imgSource: ""
         checkable: true
@@ -108,7 +108,7 @@ Rectangle
             anchors.centerIn: parent
             height: parent.height - 2
             label: "M"
-            labelColor: "#3C4A55"
+            labelColor: UISettings.fgMain
             fontSize: height - 2
             fontBold: true
         }

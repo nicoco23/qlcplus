@@ -27,6 +27,10 @@
 
 #include "previewcontext.h"
 
+#define KXMLQLCProgrammer QStringLiteral("Programmer")
+
+class QXmlStreamReader;
+class QXmlStreamWriter;
 class PlaybackManager;
 class ContextManager;
 class Function;
@@ -57,6 +61,9 @@ class ProgrammerManager final : public PreviewContext
     Q_PROPERTY(qreal tilt READ tilt NOTIFY positionChanged)
     Q_PROPERTY(qreal fan READ fan WRITE setFan NOTIFY positionChanged)
     Q_PROPERTY(QString nextCueName READ nextCueName NOTIFY programmerChanged)
+    Q_PROPERTY(qreal cueFade READ cueFade WRITE setCueFade NOTIFY cueFadeChanged)
+    Q_PROPERTY(QVariantList colorMemories READ colorMemories NOTIFY memoriesChanged)
+    Q_PROPERTY(QVariantList positionMemories READ positionMemories NOTIFY memoriesChanged)
 
 public:
     ProgrammerManager(QQuickView *view, Doc *doc, ContextManager *ctx,
@@ -115,6 +122,33 @@ public:
     /** Release everything held by the programmer (values and effects) */
     Q_INVOKABLE void clearProgrammer();
 
+    /** Record a cue and add it to a playback picked in the Playbacks window:
+     *  the playback becomes a cue stack (GO = next cue) */
+    Q_INVOKABLE void recordAppend(const QString &name);
+
+    /** Merge the programmer into the cue of a playback picked in the Playbacks
+     *  window (the current step for a cue stack) */
+    Q_INVOKABLE void startUpdate();
+
+    /** Open white at full on the selection, centred, to find the fixtures */
+    Q_INVOKABLE void locate();
+
+    /** Fade time of the recorded cues, in seconds */
+    qreal cueFade() const { return m_cueFade; }
+    void setCueFade(qreal seconds);
+
+    /* Memories: user colour and position palettes (saved in the project) */
+    static const int MemoryCount = 8;
+    QVariantList colorMemories() const;
+    QVariantList positionMemories() const;
+    /** Recall a memory, or store the current colour / position in an empty one */
+    Q_INVOKABLE void memoryPress(const QString &kind, int index);
+    Q_INVOKABLE void memoryClear(const QString &kind, int index);
+
+    void resetContents();
+    bool loadXML(QXmlStreamReader &root);
+    bool saveXML(QXmlStreamWriter *doc) const;
+
 signals:
     void groupsChanged();
     void selectionChanged();
@@ -123,9 +157,12 @@ signals:
     void effectParamsChanged();
     void positionChanged();
     void recorded(QString name, QString where);
+    void cueFadeChanged();
+    void memoriesChanged();
 
 private slots:
     void slotSelectionChanged();
+    void slotSlotPicked(QString mode, bool isFader, int index, quint32 functionId);
 
 private:
     QList<quint32> selectedFixtures() const;
@@ -134,6 +171,22 @@ private:
     void removeEffect(const QString &key, bool deleteFunction);
     void updateEffectParams();
     uint effectDuration(const QString &key) const;
+
+    struct Memory
+    {
+        bool used = false;
+        QString name;
+        QColor color;
+        qreal pan = 0, tilt = 0, fan = 0;
+        bool crossed = false;
+    };
+    QVariantList memoryList(const QVector<Memory> &list, bool colour) const;
+
+    bool hasContent() const;
+    quint32 buildCue(const QString &cueName);
+    void resetAfterRecord();
+    void appendToSlot(bool isFader, int index, quint32 slotFid);
+    void updateSlot(bool isFader, int index, quint32 slotFid);
 
 private:
     ContextManager *m_contextManager;
@@ -154,6 +207,14 @@ private:
     qreal m_size;
     bool m_spread;
     int m_cueCounter;
+    qreal m_cueFade;
+    QColor m_lastColor;
+
+    quint32 m_pendingCue;           // cue waiting to be added to a picked playback
+    QString m_pendingName;
+
+    QVector<Memory> m_colorMemories;
+    QVector<Memory> m_positionMemories;
 };
 
 #endif // PROGRAMMERMANAGER_H

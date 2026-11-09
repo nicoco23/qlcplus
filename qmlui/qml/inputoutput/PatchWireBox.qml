@@ -39,8 +39,8 @@ Canvas
         var nodeSize = 8
         var halfNode = nodeSize / 2
         var vCenter = (height / 2) - halfNode
-        context.strokeStyle = "yellow"
-        context.fillStyle = "yellow"
+        context.strokeStyle = UISettings.kahoMauve
+        context.fillStyle = UISettings.kahoMauve
         context.lineWidth = 3
         context.beginPath()
         context.clearRect(0, 0, width, height)
@@ -77,8 +77,8 @@ Canvas
             if (showFeedback)
             {
                 yPos = vCenter + (UISettings.bigItemHeight * 0.4) - (UISettings.iconSizeMedium * 0.4)
-                context.strokeStyle = "green"
-                context.fillStyle = "green"
+                context.strokeStyle = UISettings.consoleGo
+                context.fillStyle = UISettings.consoleGo
 
                 context.ellipse(0, yPos - halfNode, nodeSize, nodeSize)
                 context.fill()

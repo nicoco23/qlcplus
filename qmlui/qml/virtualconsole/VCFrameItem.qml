@@ -31,7 +31,7 @@ VCWidgetItem
     property bool isSolo: false
     property bool isCollapsed: frameObj ? frameObj.isCollapsed : false
 
-    color: dropActive ? UISettings.activeDropArea : (frameObj ? frameObj.backgroundColor : "darkgray")
+    color: dropActive ? UISettings.activeDropArea : (frameObj ? frameObj.backgroundColor : UISettings.bgMedium)
     clip: true
 
     onFrameObjChanged:
@@ -95,8 +95,8 @@ VCWidgetItem
                 //radius: 3
                 gradient: Gradient
                 {
-                    GradientStop { position: 0; color: isSolo ? "#BC0A0A" : "#666666" }
-                    GradientStop { position: 1; color: isSolo ? "#370303" : "#000000" }
+                    GradientStop { position: 0; color: isSolo ? UISettings.consoleRelease : UISettings.bgControl }
+                    GradientStop { position: 1; color: isSolo ? Qt.darker(UISettings.consoleRelease, 2.5) : UISettings.bgStrong }
                 }
                 Layout.fillWidth: true
 

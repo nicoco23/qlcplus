@@ -47,6 +47,18 @@ the fork changes. All original copyright notices are kept.
   hand. Uses the existing ContextManager dump values as the programmer;
   `ContextManager::dumpValues()` and `ContextManager::unsetDumpChannels()`
   were added for it. The Virtual Console key moves to F7.
+- **Programmer, second pass**: cue stacks (`+ PILE` records a cue and adds it
+  to a picked playback, which becomes a Chaser with infinite hold: GO = next
+  cue), update of an existing cue (`MÀJ` merges the programmer into the picked
+  playback, the current step of a stack), fade time of the recorded cues,
+  LOCATE, and 8 colour + 8 position memories saved in the workspace
+  (`<Programmer>` element, ignored by upstream QLC+). PlaybackManager gained a
+  "pick" mode (`pickMode`, `pickSlot()`, `slotPicked()`, `replaceSlotFunction()`).
+- **KAHO look on the whole interface**: KAHO faders (`QLCPlusFader.qml`), dark
+  flat keys (`IconButton.qml`, `GenericButton.qml`, `KeyPad.qml`), flat upper
+  case tabs (`MenuBarEntry.qml`), KAHO colours in the 2D view, Input/Output
+  patch, Show Manager tracks, check boxes, spin boxes and side panels, and a
+  KAHO default background for Virtual Console widgets (`vcwidget.cpp`).
 - **KahoStage scene import** (`qmlui/kahostageimport.*`, Actions menu > File):
   reads the `KahoStage-scene.json` written by the KahoStage Minecraft plugin
   and places the fixtures (matched by name) and the trusses in the 2D / 3D

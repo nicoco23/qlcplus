@@ -72,8 +72,8 @@ RadioButton
             id: cbBody
             color: hovered ? hoverColor : bgColor
             radius: 5
-            border.color: controlRoot.focus ? UISettings.highlight : UISettings.bgStrong
-            border.width: 2
+            border.color: controlRoot.focus ? UISettings.highlight : UISettings.borderColorDark
+            border.width: 1
         }
 
     indicator:
@@ -81,7 +81,7 @@ RadioButton
         {
             visible: checked
             anchors.centerIn: parent
-            color: "lime"
+            color: UISettings.kahoMauve
             font.family: UISettings.fontAwesomeFontName
             font.pixelSize: controlRoot.height * 0.80
             text: FontAwesome.fa_check

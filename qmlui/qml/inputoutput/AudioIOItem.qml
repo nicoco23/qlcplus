@@ -87,8 +87,8 @@ Rectangle
         gradient: Gradient
         {
             id: bgGradient
-            GradientStop { position: 0 ; color: "#1A551B" }
-            GradientStop { position: 1 ; color: "#3C832B" }
+            GradientStop { position: 0 ; color: "#1d4d3a" }
+            GradientStop { position: 1 ; color: "#2f7d5c" }
         }
         border.width: 2
         border.color: UISettings.borderColorDark

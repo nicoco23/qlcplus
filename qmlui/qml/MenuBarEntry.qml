@@ -41,8 +41,8 @@ Button
     property string entryText: ""
     property real mFontSize: UISettings.textSizeDefault * 0.70
     /** false = flat console tab: no icon, upper case label, accent color when checked */
-    property bool showIcon: true
-    property int iconSize: (imgSource && showIcon) ? height - 4 - topPadding - bottomPadding : 0
+    property bool showIcon: false
+    property int iconSize: (imgSource && (showIcon || entryText === "")) ? height - 4 - topPadding - bottomPadding : 0
     property int iconRotation: 0
 
     property Gradient bgGradient: defBgGradient
@@ -80,7 +80,7 @@ Button
             Image
             {
                 id: btnIcon
-                visible: control.imgSource && control.showIcon
+                visible: control.imgSource && (control.showIcon || control.entryText === "")
                 x: 2
                 anchors.verticalCenter: parent.verticalCenter
                 height: control.iconSize

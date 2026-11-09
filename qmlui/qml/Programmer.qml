@@ -37,6 +37,7 @@ Rectangle
     readonly property real unit: UISettings.listItemHeight
     readonly property real gap: Math.max(3, unit * 0.12)
     readonly property bool hasSelection: programmer.selectionCount > 0
+    readonly property bool hasContent: programmer.programmerCount > 0 || programmer.effects.some(function(e) { return e.running })
     property real intensity: 1.0
     property string lastMessage: ""
 
@@ -310,11 +311,14 @@ Rectangle
                 GridLayout
                 {
                     Layout.alignment: Qt.AlignTop
-                    columns: 2
+                    columns: 3
                     rowSpacing: pgRoot.gap
                     columnSpacing: pgRoot.gap
                     ConsoleKey { Layout.preferredWidth: pgRoot.unit * 2.4; Layout.preferredHeight: pgRoot.unit * 0.95; text: qsTr("TOUT"); onClicked: programmer.selectAll() }
                     ConsoleKey { Layout.preferredWidth: pgRoot.unit * 2.4; Layout.preferredHeight: pgRoot.unit * 0.95; text: qsTr("AUCUN"); enabled: pgRoot.hasSelection; onClicked: programmer.clearSelection() }
+                    ConsoleKey { Layout.preferredWidth: pgRoot.unit * 2.4; Layout.preferredHeight: pgRoot.unit * 0.95; Layout.rowSpan: 2; Layout.fillHeight: true
+                                 text: qsTr("LOCATE"); subText: qsTr("blanc, plein, centre"); enabled: pgRoot.hasSelection
+                                 onClicked: { pgRoot.intensity = 1; programmer.locate() } }
                     ConsoleKey { Layout.preferredWidth: pgRoot.unit * 2.4; Layout.preferredHeight: pgRoot.unit * 0.95; text: qsTr("IMPAIRS"); enabled: programmer.selectionCount > 1; onClicked: programmer.selectOddEven(true) }
                     ConsoleKey { Layout.preferredWidth: pgRoot.unit * 2.4; Layout.preferredHeight: pgRoot.unit * 0.95; text: qsTr("PAIRS"); enabled: programmer.selectionCount > 1; onClicked: programmer.selectOddEven(false) }
                 }
@@ -506,6 +510,62 @@ Rectangle
                             onPositionChanged: (mouse) => pick(mouse.x)
                         }
                     }
+
+                    // user colour memories: empty = store the current colour, full = recall, right click = clear
+                    Row
+                    {
+                        Layout.fillWidth: true
+                        spacing: 3
+                        Text
+                        {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: pgRoot.unit * 1.1
+                            text: qsTr("MÉM.")
+                            color: UISettings.fgMedium
+                            font.family: UISettings.titleFontName
+                            font.pixelSize: UISettings.textSizeDefault * 0.55
+                        }
+                        Repeater
+                        {
+                            model: programmer.colorMemories
+                            Rectangle
+                            {
+                                width: (parent.width - pgRoot.unit * 1.1 - 3 * 8) / 8
+                                height: width
+                                radius: width / 2
+                                color: modelData.used ? modelData.color : "transparent"
+                                border.width: cmArea.containsMouse ? 2 : 1
+                                border.color: cmArea.containsMouse ? UISettings.fgMain : (modelData.used ? Qt.darker(modelData.color, 1.6) : UISettings.bgLight)
+                                Text
+                                {
+                                    visible: !modelData.used
+                                    anchors.centerIn: parent
+                                    text: "+"
+                                    color: UISettings.bgLighter
+                                    font.pixelSize: parent.height * 0.6
+                                }
+                                MouseArea
+                                {
+                                    id: cmArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    onClicked: (mouse) =>
+                                    {
+                                        pgRoot.forceActiveFocus()
+                                        if (mouse.button === Qt.RightButton)
+                                            programmer.memoryClear("color", index)
+                                        else
+                                            programmer.memoryPress("color", index)
+                                    }
+                                    ToolTip.visible: containsMouse
+                                    ToolTip.delay: 500
+                                    ToolTip.text: modelData.used ? qsTr("Rappeler · clic droit pour effacer")
+                                                                 : qsTr("Mémoriser la dernière couleur choisie")
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -649,6 +709,59 @@ Rectangle
                             fillColor: UISettings.fgLight
                             onMoved: (v) => { zoom = v; programmer.setZoom(v) }
                         }
+                        Row
+                        {
+                            Layout.fillWidth: true
+                            spacing: 3
+                            Text
+                            {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: pgRoot.unit * 2.2
+                                text: qsTr("Mémoires")
+                                color: UISettings.fgLight
+                                font.family: UISettings.robotoFontName
+                                font.pixelSize: UISettings.textSizeDefault * 0.7
+                            }
+                            Repeater
+                            {
+                                model: programmer.positionMemories
+                                Rectangle
+                                {
+                                    width: (parent.width - pgRoot.unit * 2.2 - 3 * 8) / 8
+                                    height: pgRoot.unit * 0.8
+                                    radius: 4
+                                    color: modelData.used ? (pmArea.containsMouse ? UISettings.bgLight : UISettings.bgControl) : "transparent"
+                                    border.color: pmArea.containsMouse ? UISettings.consoleAccent : (modelData.used ? UISettings.borderColorDark : UISettings.bgLight)
+                                    Text
+                                    {
+                                        anchors.centerIn: parent
+                                        text: modelData.used ? (index + 1) : "+"
+                                        color: modelData.used ? UISettings.fgMain : UISettings.bgLighter
+                                        font.family: UISettings.titleFontName
+                                        font.pixelSize: UISettings.textSizeDefault * 0.65
+                                    }
+                                    MouseArea
+                                    {
+                                        id: pmArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                        onClicked: (mouse) =>
+                                        {
+                                            pgRoot.forceActiveFocus()
+                                            if (mouse.button === Qt.RightButton)
+                                                programmer.memoryClear("position", index)
+                                            else
+                                                programmer.memoryPress("position", index)
+                                        }
+                                        ToolTip.visible: containsMouse
+                                        ToolTip.delay: 500
+                                        ToolTip.text: modelData.used ? qsTr("%1 · clic droit pour effacer").arg(modelData.name)
+                                                                     : qsTr("Mémoriser la position actuelle")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -761,37 +874,73 @@ Rectangle
                         }
                     }
 
+                    HSlider
+                    {
+                        Layout.fillWidth: true
+                        label: qsTr("Fondu")
+                        value: programmer.cueFade / 10
+                        valueText: programmer.cueFade < 0.05 ? qsTr("net") : programmer.cueFade.toFixed(1) + " s"
+                        fillColor: UISettings.fgLight
+                        onMoved: (v) => programmer.cueFade = Math.round(v * 100) / 10
+                    }
                     ConsoleKey
                     {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: pgRoot.unit * 1.5
+                        Layout.preferredHeight: pgRoot.unit * 1.4
                         text: qsTr("ENREGISTRER")
                         subText: qsTr("sur le 1er playback libre · Entrée")
                         lit: enabled
                         keyColor: UISettings.consoleRelease
                         fontSize: UISettings.textSizeDefault * 0.85
-                        enabled: programmer.programmerCount > 0 || programmer.effects.some(function(e) { return e.running })
+                        enabled: pgRoot.hasContent
                         onClicked: programmer.record(cueName.text, true)
                     }
-                    ConsoleKey
+                    GridLayout
                     {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: pgRoot.unit * 1.1
-                        text: qsTr("ENREGISTRER SUR…")
-                        subText: qsTr("choisir l'emplacement · Maj+Entrée")
-                        fontSize: UISettings.textSizeDefault * 0.7
-                        enabled: programmer.programmerCount > 0 || programmer.effects.some(function(e) { return e.running })
-                        onClicked: programmer.record(cueName.text, false)
-                    }
-                    ConsoleKey
-                    {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: pgRoot.unit * 1.1
-                        text: qsTr("CLEAR")
-                        subText: qsTr("vider le programmeur · Ctrl+Retour")
-                        textColor: UISettings.consoleRelease
-                        fontSize: UISettings.textSizeDefault * 0.7
-                        onClicked: programmer.clearProgrammer()
+                        columns: 2
+                        rowSpacing: pgRoot.gap
+                        columnSpacing: pgRoot.gap
+                        ConsoleKey
+                        {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: pgRoot.unit * 1.1
+                            text: qsTr("SUR…")
+                            subText: qsTr("choisir · Maj+Entrée")
+                            fontSize: UISettings.textSizeDefault * 0.68
+                            enabled: pgRoot.hasContent
+                            onClicked: programmer.record(cueName.text, false)
+                        }
+                        ConsoleKey
+                        {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: pgRoot.unit * 1.1
+                            text: qsTr("+ PILE")
+                            subText: qsTr("cue suivant d'un PB")
+                            fontSize: UISettings.textSizeDefault * 0.68
+                            enabled: pgRoot.hasContent
+                            onClicked: programmer.recordAppend(cueName.text)
+                        }
+                        ConsoleKey
+                        {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: pgRoot.unit * 1.1
+                            text: qsTr("MÀJ")
+                            subText: qsTr("modifier un cue")
+                            fontSize: UISettings.textSizeDefault * 0.68
+                            enabled: pgRoot.hasContent
+                            onClicked: programmer.startUpdate()
+                        }
+                        ConsoleKey
+                        {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: pgRoot.unit * 1.1
+                            text: qsTr("CLEAR")
+                            subText: qsTr("Ctrl+Retour")
+                            textColor: UISettings.consoleRelease
+                            fontSize: UISettings.textSizeDefault * 0.68
+                            onClicked: programmer.clearProgrammer()
+                        }
                     }
                     Text
                     {

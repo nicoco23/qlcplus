@@ -325,7 +325,7 @@ Rectangle
                 height: width
                 faSource: (showManager.isPlaying && !showManager.isPaused) ? FontAwesome.fa_pause : FontAwesome.fa_play
                 faColor: UISettings.fgMain
-                bgColor: showManager.isPaused ? "green" :
+                bgColor: showManager.isPaused ? UISettings.consoleGo :
                          (showManager.isPlaying ? "darkorange" : UISettings.bgLight)
                 tooltip: (showManager.isPlaying && !showManager.isPaused) ? qsTr("Pause") : qsTr("Play or resume")
                 checkable: false
@@ -339,7 +339,7 @@ Rectangle
                 height: width
                 faSource: FontAwesome.fa_stop
                 faColor: UISettings.fgMain
-                bgColor: showManager.isPlaying ? "red" : UISettings.bgLight
+                bgColor: showManager.isPlaying ? UISettings.consoleRelease : UISettings.bgControl
                 tooltip: qsTr("Stop or rewind")
                 checkable: false
                 enabled: showManager.isEditing
@@ -772,7 +772,7 @@ Rectangle
                 z: 10
                 width: 1
                 height: parent.height
-                color: "#00FF00"
+                color: UISettings.consoleGo
                 visible: showManager.snapGuideX >= 0
             }
 
@@ -849,7 +849,7 @@ Rectangle
                             PropertyChanges
                             {
                                 target: newTrackBox
-                                color: "#3F00FF00"
+                                color: Qt.rgba(UISettings.consoleGo.r, UISettings.consoleGo.g, UISettings.consoleGo.b, 0.25)
                             }
                             PropertyChanges
                             {

@@ -49,7 +49,10 @@ Rectangle
     /* playbacks flashed from the keyboard (Alt + digit) */
     property var flashKeys: ({})
 
-    readonly property bool targeting: assigning || dragging
+    /* the programmer waits for a playback to add a cue to, or to update */
+    readonly property bool picking: playbackManager.pickMode !== ""
+
+    readonly property bool targeting: assigning || dragging || picking
 
     readonly property var swatchColors: [ "#a98bff", "#6b9bff", "#5ad1e6", "#5fd39a",
                                      "#ffe066", "#ffb86b", "#ff6b7a", "#ff7ad9", "#e8e6f0" ]
@@ -90,6 +93,7 @@ Rectangle
 
     function cancelModes()
     {
+        playbackManager.pickMode = ""
         playbackManager.armedFunction = noFunction
         moveKind = ""
         moveFrom = -1
@@ -98,6 +102,11 @@ Rectangle
     /** Common click handling of a slot when a mode is active. Returns true if consumed. */
     function slotModeClick(kind, index)
     {
+        if (picking)
+        {
+            playbackManager.pickSlot(kind === "fader", index)
+            return true
+        }
         if (assigning)
         {
             if (kind === "fader")
@@ -387,10 +396,12 @@ Rectangle
                 Text
                 {
                     Layout.maximumWidth: pbRoot.width * 0.38
-                    text: pbRoot.assigning ? qsTr("Clique sur un playback ou un bouton pour y placer la fonction · Échap pour annuler")
+                    text: playbackManager.pickMode === "append" ? qsTr("Clique sur le playback qui reçoit le nouveau cue (il devient une pile, GO = cue suivant) · Échap pour annuler")
+                          : playbackManager.pickMode === "update" ? qsTr("Clique sur le playback à mettre à jour avec le programmeur · Échap pour annuler")
+                          : pbRoot.assigning ? qsTr("Clique sur un playback ou un bouton pour y placer la fonction · Échap pour annuler")
                           : pbRoot.moving ? qsTr("Clique sur l'emplacement de destination · Échap pour annuler")
                           : qsTr("1-8 GO · Ctrl+1-8 REL · Alt+1-8 FLASH · Pg↑/Pg↓ pages · clic droit = options")
-                    color: (pbRoot.assigning || pbRoot.moving) ? UISettings.consoleAccent : UISettings.bgLighter
+                    color: (pbRoot.targeting || pbRoot.moving) ? UISettings.consoleAccent : UISettings.bgLighter
                     font.family: UISettings.robotoFontName
                     font.pixelSize: UISettings.textSizeDefault * 0.75
                     elide: Text.ElideRight
@@ -578,7 +589,7 @@ Rectangle
                         {
                             show: (pbRoot.targeting && (execArea.containsMouse || execDrop.containsDrag))
                                   || (pbRoot.moving && pbRoot.moveKind === "exec" && pbRoot.moveFrom !== index && execArea.containsMouse)
-                            hot: execDrop.containsDrag || (execArea.containsMouse && (pbRoot.assigning || pbRoot.moving))
+                            hot: execDrop.containsDrag || (execArea.containsMouse && (pbRoot.assigning || pbRoot.moving || pbRoot.picking))
                         }
 
                         DropArea
@@ -945,7 +956,7 @@ Rectangle
                     {
                         show: (pbRoot.targeting && (!strip.assigned || stripHeaderArea.containsMouse || stripDrop.containsDrag))
                               || (pbRoot.moving && pbRoot.moveKind === "fader" && pbRoot.moveFrom !== index)
-                        hot: stripDrop.containsDrag || (stripHeaderArea.containsMouse && (pbRoot.assigning || pbRoot.moving))
+                        hot: stripDrop.containsDrag || (stripHeaderArea.containsMouse && (pbRoot.assigning || pbRoot.moving || pbRoot.picking))
                     }
 
                     DropArea

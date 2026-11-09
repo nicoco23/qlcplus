@@ -69,7 +69,7 @@ SpinBox
     background: Rectangle {
         implicitWidth: parent.width
         color: UISettings.bgControl
-        border.color: "#222"
+        border.color: UISettings.borderColorDark
         radius: 3
     }
 

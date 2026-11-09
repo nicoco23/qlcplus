@@ -36,8 +36,8 @@ Button
     rightPadding: 0
 
     property int counter: 1
-    property color bgColor: UISettings.bgLight
-    property color hoverColor: UISettings.hover
+    property color bgColor: UISettings.bgControl
+    property color hoverColor: UISettings.bgLight
     property color pressColor: UISettings.highlightPressed
     property color checkedColor: UISettings.highlight
 
@@ -46,7 +46,7 @@ Button
     property string imgSource: ""
     property int imgMargins: 6
     property string faSource: ""
-    property color faColor: UISettings.bgStrong
+    property color faColor: UISettings.fgLight
 
     property string tooltip: ""
 
@@ -108,7 +108,9 @@ Button
                 id: faIcon
                 visible: faSource ? true : false
                 anchors.centerIn: parent
-                color: faColor
+                // KAHO: a dark glyph on the dark keys would vanish
+                color: control.checked ? UISettings.bgStronger
+                       : (faColor.hslLightness < 0.3 ? UISettings.fgLight : faColor)
                 font.family: UISettings.fontAwesomeFontName
                 font.pixelSize: control.height * 0.70
                 text: faSource
@@ -120,9 +122,9 @@ Button
         {
             id: contentBody
             color: bgColor
-            radius: 5
-            border.color: "#1D1D1D"
-            border.width: 2
+            radius: 6
+            border.color: control.checked ? Qt.lighter(checkedColor, 1.3) : UISettings.borderColorDark
+            border.width: 1
 
             states: [
                 State

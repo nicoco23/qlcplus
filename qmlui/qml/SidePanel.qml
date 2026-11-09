@@ -113,15 +113,15 @@ Rectangle
         id: gradientBorder
         x: sidePanelRoot.panelAlignment == Qt.AlignRight ? 0 : parent.width - width
         height: parent.height
-        color: "#141414"
+        color: UISettings.bgStronger
         width: collapseWidth
         gradient: Gradient
         {
             orientation: Gradient.Horizontal
-            GradientStop { position: 0; color: "#141414" }
+            GradientStop { position: 0; color: UISettings.bgStronger }
             GradientStop { position: 0.21; color: UISettings.bgStrong }
             GradientStop { position: 0.79; color: UISettings.bgStrong }
-            GradientStop { position: 1; color: "#141414" }
+            GradientStop { position: 1; color: UISettings.bgStronger }
         }
 
         MouseArea

@@ -21,6 +21,8 @@
 #include <QQmlContext>
 #include <QQuickView>
 #include <QRegularExpression>
+#include <QXmlStreamReader>
+#include <QXmlStreamWriter>
 
 #include "programmermanager.h"
 #include "playbackmanager.h"
@@ -33,6 +35,8 @@
 #include "qlccapability.h"
 #include "qlcchannel.h"
 #include "collection.h"
+#include "chaserstep.h"
+#include "chaser.h"
 #include "rgbmatrix.h"
 #include "fixture.h"
 #include "scene.h"
@@ -108,6 +112,10 @@ ProgrammerManager::ProgrammerManager(QQuickView *view, Doc *doc, ContextManager 
     , m_size(0.5)
     , m_spread(true)
     , m_cueCounter(0)
+    , m_cueFade(0)
+    , m_pendingCue(Function::invalidId())
+    , m_colorMemories(MemoryCount)
+    , m_positionMemories(MemoryCount)
 {
     setContextResource("qrc:/Programmer.qml");
     setContextTitle(tr("Programmer"));
@@ -115,6 +123,7 @@ ProgrammerManager::ProgrammerManager(QQuickView *view, Doc *doc, ContextManager 
     view->rootContext()->setContextProperty("programmer", this);
 
     connect(m_contextManager, &ContextManager::selectedFixturesChanged, this, &ProgrammerManager::slotSelectionChanged);
+    connect(m_playbacks, &PlaybackManager::slotPicked, this, &ProgrammerManager::slotSlotPicked);
     connect(m_contextManager, &ContextManager::dumpValuesCountChanged, this, &ProgrammerManager::programmerChanged);
     connect(m_doc, &Doc::fixtureGroupAdded, this, &ProgrammerManager::groupsChanged);
     connect(m_doc, &Doc::fixtureGroupRemoved, this, &ProgrammerManager::groupsChanged);
@@ -298,6 +307,7 @@ void ProgrammerManager::setIntensity(qreal level)
 
 void ProgrammerManager::setColor(QColor color)
 {
+    m_lastColor = color;
     m_contextManager->setColorValue(color, QColor(0, 0, 0));
 }
 
@@ -710,9 +720,13 @@ QString ProgrammerManager::nextCueName() const
     return QString("Cue %1").arg(highest + 1);
 }
 
-quint32 ProgrammerManager::record(const QString &name, bool toFreeSlot)
+bool ProgrammerManager::hasContent() const
 {
-    QString cueName = name.trimmed().isEmpty() ? nextCueName() : name.trimmed();
+    return m_contextManager->dumpValues().isEmpty() == false || m_effects.isEmpty() == false;
+}
+
+quint32 ProgrammerManager::buildCue(const QString &cueName)
+{
     QList<SceneValue> values = m_contextManager->dumpValues();
     QList<quint32> parts;
     bool multiple = (values.isEmpty() ? 0 : 1) + m_effects.count() > 1;
@@ -723,6 +737,9 @@ quint32 ProgrammerManager::record(const QString &name, bool toFreeSlot)
         scene->setName(multiple ? tr("%1 · base").arg(cueName) : cueName);
         for (const SceneValue &sv : values)
             scene->setValue(sv);
+        uint fade = uint(qRound(m_cueFade * 1000));
+        scene->setFadeInSpeed(fade);
+        scene->setFadeOutSpeed(fade);
         if (m_doc->addFunction(scene) == false)
         {
             delete scene;
@@ -763,6 +780,12 @@ quint32 ProgrammerManager::record(const QString &name, bool toFreeSlot)
         cueId = coll->id();
     }
 
+    resetAfterRecord();
+    return cueId;
+}
+
+void ProgrammerManager::resetAfterRecord()
+{
     // the effects now belong to the cue: stop them without deleting them
     const QStringList keys = m_effects.keys();
     for (const QString &key : keys)
@@ -772,6 +795,16 @@ quint32 ProgrammerManager::record(const QString &name, bool toFreeSlot)
     m_pan = m_tilt = m_fan = 0;
     m_crossed = false;
     emit positionChanged();
+    emit effectsChanged();
+    emit programmerChanged();
+}
+
+quint32 ProgrammerManager::record(const QString &name, bool toFreeSlot)
+{
+    QString cueName = name.trimmed().isEmpty() ? nextCueName() : name.trimmed();
+    quint32 cueId = buildCue(cueName);
+    if (cueId == Function::invalidId())
+        return cueId;
 
     if (toFreeSlot && m_playbacks->assignToFree(cueId))
     {
@@ -783,10 +816,345 @@ quint32 ProgrammerManager::record(const QString &name, bool toFreeSlot)
         m_contextManager->switchToContext("PLAYBACKS");
         emit recorded(cueName, tr("à placer : clique sur un playback ou un bouton"));
     }
-
-    emit effectsChanged();
-    emit programmerChanged();
     return cueId;
+}
+
+void ProgrammerManager::recordAppend(const QString &name)
+{
+    if (hasContent() == false)
+        return;
+    m_pendingName = name.trimmed().isEmpty() ? nextCueName() : name.trimmed();
+    m_pendingCue = buildCue(m_pendingName);
+    if (m_pendingCue == Function::invalidId())
+        return;
+    m_playbacks->setPickMode("append");
+    m_contextManager->switchToContext("PLAYBACKS");
+}
+
+void ProgrammerManager::startUpdate()
+{
+    if (hasContent() == false)
+        return;
+    m_playbacks->setPickMode("update");
+    m_contextManager->switchToContext("PLAYBACKS");
+}
+
+void ProgrammerManager::slotSlotPicked(QString mode, bool isFader, int index, quint32 functionId)
+{
+    if (mode == "append")
+        appendToSlot(isFader, index, functionId);
+    else if (mode == "update")
+        updateSlot(isFader, index, functionId);
+}
+
+void ProgrammerManager::appendToSlot(bool isFader, int index, quint32 slotFid)
+{
+    quint32 cue = m_pendingCue;
+    m_pendingCue = Function::invalidId();
+    if (m_doc->function(cue) == nullptr)
+        return;
+
+    Function *current = m_doc->function(slotFid);
+    if (current == nullptr)
+    {
+        // empty slot: the cue simply goes there
+        m_playbacks->replaceSlotFunction(isFader, index, cue);
+        emit recorded(m_pendingName, tr("placé sur l'emplacement choisi"));
+        return;
+    }
+
+    Chaser *stack = qobject_cast<Chaser *>(current);
+    if (stack == nullptr)
+    {
+        // turn the slot into a cue stack: the current cue, then the new one, GO goes to the next
+        stack = new Chaser(m_doc);
+        stack->setName(tr("Pile · %1").arg(current->name()));
+        stack->setRunOrder(Function::Loop);
+        stack->setFadeInMode(Chaser::Default);
+        stack->setFadeOutMode(Chaser::Default);
+        stack->setDurationMode(Chaser::Common);
+        stack->setDuration(Function::infiniteSpeed());
+        if (m_doc->addFunction(stack) == false)
+        {
+            delete stack;
+            return;
+        }
+        stack->addStep(ChaserStep(current->id()));
+        stack->addStep(ChaserStep(cue));
+        m_playbacks->replaceSlotFunction(isFader, index, stack->id());
+    }
+    else
+    {
+        stack->addStep(ChaserStep(cue));
+    }
+    m_doc->setModified();
+    emit recorded(m_pendingName, tr("ajouté en pas %1 de « %2 »").arg(stack->stepsCount()).arg(stack->name()));
+}
+
+void ProgrammerManager::updateSlot(bool isFader, int index, quint32 slotFid)
+{
+    Function *f = m_doc->function(slotFid);
+    if (f == nullptr || hasContent() == false)
+        return;
+
+    // the function to update: the slot's one, or the current step of a cue stack
+    Chaser *stack = qobject_cast<Chaser *>(f);
+    int stepIndex = -1;
+    if (stack != nullptr && stack->stepsCount() > 0)
+    {
+        stepIndex = stack->isRunning() ? qMax(0, stack->currentStepIndex()) : 0;
+        ChaserStep *step = stack->stepAt(stepIndex);
+        f = step ? m_doc->function(step->fid) : nullptr;
+        if (f == nullptr)
+            return;
+    }
+
+    Collection *coll = qobject_cast<Collection *>(f);
+    Scene *scene = qobject_cast<Scene *>(f);
+    if (coll != nullptr)
+    {
+        for (quint32 id : coll->functions())
+        {
+            scene = qobject_cast<Scene *>(m_doc->function(id));
+            if (scene)
+                break;
+        }
+    }
+
+    QList<SceneValue> values = m_contextManager->dumpValues();
+    if (values.isEmpty() == false)
+    {
+        if (scene == nullptr)
+        {
+            scene = new Scene(m_doc);
+            scene->setName(tr("%1 · base").arg(f->name()));
+            if (m_doc->addFunction(scene) == false)
+            {
+                delete scene;
+                return;
+            }
+            if (coll)
+                coll->addFunction(scene->id(), 0);
+        }
+        for (const SceneValue &sv : values)
+            scene->setValue(sv);
+    }
+
+    if (m_effects.isEmpty() == false)
+    {
+        if (coll == nullptr)
+        {
+            // a plain scene (or effect) becomes a collection holding it and the new effects
+            coll = new Collection(m_doc);
+            coll->setName(f->name());
+            if (m_doc->addFunction(coll) == false)
+            {
+                delete coll;
+                return;
+            }
+            coll->addFunction(f->id());
+            f->setName(tr("%1 · base").arg(f->name()));
+            if (stack != nullptr)
+                stack->stepAt(stepIndex)->fid = coll->id();
+            else
+                m_playbacks->replaceSlotFunction(isFader, index, coll->id());
+        }
+        for (auto it = m_effects.cbegin(); it != m_effects.cend(); ++it)
+        {
+            Function *fx = m_doc->function(it.value().functionId);
+            const EffectDef *def = effectDef(it.key());
+            if (fx == nullptr)
+                continue;
+            fx->setName(tr("%1 · %2").arg(coll->name(), def ? tr(def->label) : QString()));
+            FixtureGroup *grp = m_doc->fixtureGroup(it.value().groupId);
+            if (grp)
+                grp->setName(tr("%1 · groupe").arg(coll->name()));
+            coll->addFunction(fx->id());
+        }
+    }
+
+    QString name = coll ? coll->name() : f->name();
+    resetAfterRecord();
+    m_doc->setModified();
+    emit recorded(name, stack ? tr("pas %1 mis à jour").arg(stepIndex + 1) : tr("mis à jour"));
+}
+
+void ProgrammerManager::locate()
+{
+    m_contextManager->highlightFixtureSelection();
+    positionPreset("centre");
+}
+
+void ProgrammerManager::setCueFade(qreal seconds)
+{
+    seconds = qBound(0.0, seconds, 10.0);
+    if (qFuzzyCompare(seconds + 1, m_cueFade + 1))
+        return;
+    m_cueFade = seconds;
+    emit cueFadeChanged();
+}
+
+/*********************************************************************
+ * Memories (user palettes)
+ *********************************************************************/
+
+QVariantList ProgrammerManager::memoryList(const QVector<Memory> &list, bool colour) const
+{
+    QVariantList out;
+    for (const Memory &m : list)
+    {
+        QVariantMap map;
+        map.insert("used", m.used);
+        map.insert("name", m.name);
+        if (colour)
+            map.insert("color", m.used ? m.color : QColor(Qt::transparent));
+        out.append(map);
+    }
+    return out;
+}
+
+QVariantList ProgrammerManager::colorMemories() const
+{
+    return memoryList(m_colorMemories, true);
+}
+
+QVariantList ProgrammerManager::positionMemories() const
+{
+    return memoryList(m_positionMemories, false);
+}
+
+void ProgrammerManager::memoryPress(const QString &kind, int index)
+{
+    QVector<Memory> &list = kind == "color" ? m_colorMemories : m_positionMemories;
+    if (index < 0 || index >= list.count())
+        return;
+
+    Memory &m = list[index];
+    if (m.used)
+    {
+        // recall
+        if (kind == "color")
+        {
+            m_lastColor = m.color;
+            m_contextManager->setColorValue(m.color, QColor(0, 0, 0));
+        }
+        else
+        {
+            m_pan = m.pan;
+            m_tilt = m.tilt;
+            m_fan = m.fan;
+            m_crossed = m.crossed;
+            applyPosition();
+            emit positionChanged();
+        }
+        return;
+    }
+
+    // store
+    if (kind == "color")
+    {
+        if (m_lastColor.isValid() == false)
+            return;
+        m.color = m_lastColor;
+        m.name = m_lastColor.name();
+    }
+    else
+    {
+        m.pan = m_pan;
+        m.tilt = m_tilt;
+        m.fan = m_fan;
+        m.crossed = m_crossed;
+        m.name = m_crossed ? tr("Croisé") : (m_fan > 0 ? tr("Éventail %1°").arg(qRound(m_fan))
+                                                     : tr("%1° / %2°").arg(qRound(m_pan)).arg(qRound(m_tilt)));
+    }
+    m.used = true;
+    m_doc->setModified();
+    emit memoriesChanged();
+}
+
+void ProgrammerManager::memoryClear(const QString &kind, int index)
+{
+    QVector<Memory> &list = kind == "color" ? m_colorMemories : m_positionMemories;
+    if (index < 0 || index >= list.count() || list[index].used == false)
+        return;
+    list[index] = Memory();
+    m_doc->setModified();
+    emit memoriesChanged();
+}
+
+void ProgrammerManager::resetContents()
+{
+    m_colorMemories = QVector<Memory>(MemoryCount);
+    m_positionMemories = QVector<Memory>(MemoryCount);
+    m_pendingCue = Function::invalidId();
+    emit memoriesChanged();
+}
+
+bool ProgrammerManager::loadXML(QXmlStreamReader &root)
+{
+    if (root.name() != KXMLQLCProgrammer)
+        return false;
+
+    resetContents();
+    while (root.readNextStartElement())
+    {
+        if (root.name() == QLatin1String("Memory"))
+        {
+            QXmlStreamAttributes a = root.attributes();
+            bool colour = a.value("Kind") == QLatin1String("Color");
+            int index = a.value("Index").toInt();
+            QVector<Memory> &list = colour ? m_colorMemories : m_positionMemories;
+            if (index >= 0 && index < list.count())
+            {
+                Memory &m = list[index];
+                m.used = true;
+                m.name = a.value("Name").toString();
+                if (colour)
+                    m.color = QColor(a.value("Color").toString());
+                else
+                {
+                    m.pan = a.value("Pan").toDouble();
+                    m.tilt = a.value("Tilt").toDouble();
+                    m.fan = a.value("Fan").toDouble();
+                    m.crossed = a.value("Crossed") == QLatin1String("1");
+                }
+            }
+        }
+        root.skipCurrentElement();
+    }
+    emit memoriesChanged();
+    return true;
+}
+
+bool ProgrammerManager::saveXML(QXmlStreamWriter *doc) const
+{
+    doc->writeStartElement(KXMLQLCProgrammer);
+    for (int pass = 0; pass < 2; pass++)
+    {
+        const QVector<Memory> &list = pass == 0 ? m_colorMemories : m_positionMemories;
+        for (int i = 0; i < list.count(); i++)
+        {
+            const Memory &m = list.at(i);
+            if (m.used == false)
+                continue;
+            doc->writeStartElement("Memory");
+            doc->writeAttribute("Kind", pass == 0 ? "Color" : "Position");
+            doc->writeAttribute("Index", QString::number(i));
+            doc->writeAttribute("Name", m.name);
+            if (pass == 0)
+                doc->writeAttribute("Color", m.color.name());
+            else
+            {
+                doc->writeAttribute("Pan", QString::number(m.pan));
+                doc->writeAttribute("Tilt", QString::number(m.tilt));
+                doc->writeAttribute("Fan", QString::number(m.fan));
+                doc->writeAttribute("Crossed", m.crossed ? "1" : "0");
+            }
+            doc->writeEndElement();
+        }
+    }
+    doc->writeEndElement();
+    return true;
 }
 
 void ProgrammerManager::clearProgrammer()

@@ -27,8 +27,8 @@ Rectangle
     width: 150
     height: UISettings.iconSizeDefault
     color: gbMouseArea.containsMouse ? (gbMouseArea.pressed ? pressedColor : hoverColor) : bgColor
-    border.width: 2
-    border.color: UISettings.bgStrong
+    border.width: 1
+    border.color: UISettings.borderColorDark
 
     property bool useFontawesome: false // false means Roboto, true means FontAwesome
     property int fontSize: UISettings.textSizeDefault
@@ -40,7 +40,7 @@ Rectangle
     property alias label: btnText.text
     property color bgColor: UISettings.bgControl
     property color fgColor: UISettings.fgMain
-    property color hoverColor: UISettings.highlight
+    property color hoverColor: UISettings.bgLight
     property color pressedColor: UISettings.highlightPressed
     property bool repetition: false
     property bool autoHeight: false

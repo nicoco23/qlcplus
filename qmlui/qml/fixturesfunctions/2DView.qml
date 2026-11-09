@@ -26,7 +26,7 @@ import "."
 Rectangle
 {
     anchors.fill: parent
-    color: "black"
+    color: UISettings.bgStronger
     clip: true
 
     property string contextName: "2D"
@@ -192,7 +192,7 @@ Rectangle
             {
                 var context = getContext("2d")
                 context.globalAlpha = 1.0
-                context.strokeStyle = "#5F5F5F"
+                context.strokeStyle = UISettings.bgControl
                 context.fillStyle = "transparent"
                 context.lineWidth = 1
 
@@ -419,9 +419,9 @@ Rectangle
         width: 0
         height: 0
         rotation: 0
-        color: "#5F227CEB"
+        color: Qt.rgba(UISettings.kahoMauve.r, UISettings.kahoMauve.g, UISettings.kahoMauve.b, 0.25)
         border.width: 1
-        border.color: "#103A6E"
+        border.color: UISettings.kahoMauve
         transformOrigin: Item.TopLeft
 
         /* x/y are assigned from coordinates relative to the Flickable, so

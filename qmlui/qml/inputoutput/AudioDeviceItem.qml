@@ -37,7 +37,7 @@ Rectangle
         height: parent.height
         z: 1
         radius: 3
-        color: UISettings.bgLighter
+        color: UISettings.bgControl
         border.width: 2
         border.color: UISettings.borderColorDark
 
@@ -61,7 +61,7 @@ Rectangle
                 height: deviceBox.height
                 width: deviceBox.width - deviceIcon.width - 6
                 label: deviceName
-                labelColor: "black"
+                labelColor: UISettings.fgMain
                 fontSize: UISettings.textSizeDefault
                 wrapText: true
             }

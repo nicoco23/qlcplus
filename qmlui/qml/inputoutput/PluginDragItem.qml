@@ -51,7 +51,7 @@ Rectangle
                     GradientStop { position: 1 ; color: UISettings.fgMedium }
                 }
             border.width: 2
-            border.color: "#777"
+            border.color: UISettings.bgLight
             x: 5
             y: 2
 
