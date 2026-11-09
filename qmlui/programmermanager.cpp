@@ -121,6 +121,14 @@ ProgrammerManager::ProgrammerManager(QQuickView *view, Doc *doc, ContextManager 
     connect(m_doc, &Doc::loaded, this, [this]()
     {
         m_effects.clear();
+        // effects still running in the programmer when the project was saved:
+        // never recorded, they are leftovers
+        for (Function *f : m_doc->functions())
+            if (f->name().startsWith(tr("Programmeur · ")))
+                m_doc->deleteFunction(f->id());
+        for (FixtureGroup *grp : m_doc->fixtureGroups())
+            if (grp->name().startsWith(TEMP_PREFIX))
+                m_doc->deleteFixtureGroup(grp->id());
         emit groupsChanged();
         emit effectsChanged();
         emit programmerChanged();
@@ -642,7 +650,8 @@ void ProgrammerManager::updateEffectParams()
         EFX *efx = qobject_cast<EFX *>(f);
         if (efx != nullptr)
         {
-            int size = qRound(16 + m_size * 180);
+            // relative pattern: 255 would sweep the whole pan/tilt range, keep it stage sized
+            int size = qRound(6 + m_size * 80);
             efx->setWidth(size);
             efx->setHeight(size);
             efx->setPropagationMode(m_spread ? EFX::Asymmetric : EFX::Parallel);

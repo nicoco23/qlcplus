@@ -666,6 +666,17 @@ Rectangle
                     anchors.fill: parent
                     spacing: pgRoot.gap
 
+                    Text
+                    {
+                        visible: functionManager.isEditing
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
+                        text: qsTr("Une fonction est ouverte dans Patch & prog : les valeurs partent dedans. Ferme-la pour utiliser le programmeur.")
+                        color: UISettings.consoleRelease
+                        font.family: UISettings.robotoFontName
+                        font.pixelSize: UISettings.textSizeDefault * 0.65
+                    }
+
                     // what the cue will contain
                     Rectangle
                     {
