@@ -96,10 +96,13 @@ Popup
     property int dialogFileMode: FileDialog.OpenFile
     property int dialogOpMode: App.OpenMode
     property var androidDialog: null
+    /* KAHO: import of the stage layout exported by the KahoStage plugin */
+    readonly property int kahoSceneMode: 100
 
     function openDialog(opMode)
     {
         dialogOpMode = opMode
+        dialogNameFilters = [ qsTr("QLC+ files") + " (*.qxw *.qxf)", qsTr("All files") + " (*)" ]
         switch (dialogOpMode)
         {
             case App.OpenMode:
@@ -113,6 +116,11 @@ Popup
             break
             case App.ImportMode:
                 dialogTitle = qsTr("Import from project")
+            break
+            case menuRoot.kahoSceneMode:
+                dialogTitle = qsTr("Scène KahoStage (KahoStage-scene.json)")
+                dialogFileMode = FileDialog.OpenFile
+                dialogNameFilters = [ qsTr("Scène KahoStage") + " (*.json)", qsTr("All files") + " (*)" ]
             break
         }
 
@@ -163,6 +171,12 @@ Popup
                     qlcplus.exit()
             }
             break
+            case menuRoot.kahoSceneMode:
+            {
+                kahoScenePopup.message = kahoStage.importScene(dialogSelectedFile)
+                kahoScenePopup.open()
+            }
+            break
             case App.ImportMode:
             {
                 if (qlcplus.loadImportWorkspace(dialogSelectedFile) === true)
@@ -207,6 +221,14 @@ Popup
             dialogCurrentFolder = currentFolder
             handleAccept()
         }
+    }
+
+    CustomPopupDialog
+    {
+        id: kahoScenePopup
+        width: mainView.width / 2.5
+        title: qsTr("Scène KahoStage")
+        standardButtons: Dialog.Ok
     }
 
     CustomPopupDialog
@@ -445,6 +467,20 @@ Popup
                             importLoader.source = ""
                         }
                     }
+                }
+            }
+
+            ContextMenuEntry
+            {
+                id: fileKahoScene
+                imgSource: "qrc:/import.svg"
+                entryText: qsTr("Importer la scène KahoStage")
+                onEntered: fileEntryEntered(null)
+
+                onClicked:
+                {
+                    openDialog(menuRoot.kahoSceneMode)
+                    menuRoot.close()
                 }
             }
         }

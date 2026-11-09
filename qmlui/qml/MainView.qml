@@ -65,6 +65,8 @@ Rectangle
             item = ioEntry
         else if (ctx === "PLAYBACKS")
             item = pbEntry
+        else if (ctx === "PROGRAMMER")
+            item = prEntry
 
         if (item)
         {
@@ -252,6 +254,7 @@ Rectangle
                         case "FIXANDFUNC": return qsTr("Patch & programmation")
                         case "VC": return qsTr("Console virtuelle")
                         case "PLAYBACKS": return qsTr("Playbacks")
+                        case "PROGRAMMER": return qsTr("Programmeur")
                         case "SDESK": return qsTr("Pupitre simple")
                         case "SHOWMGR": return qsTr("Show")
                         case "IOMGR": return qsTr("Entrées / sorties")
@@ -714,24 +717,24 @@ Rectangle
             }
             ConsoleWindowKey
             {
-                id: vcEntry
-                property string ctxName: "VC"
-                property string ctxRes: "qrc:/VirtualConsole.qml"
+                id: prEntry
+                property string ctxName: "PROGRAMMER"
+                property string ctxRes: "qrc:/Programmer.qml"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                entryText: qsTr("Console")
+                entryText: qsTr("Programmeur")
                 keyHint: "F2"
                 ButtonGroup.group: menuBarGroup
-                visible: qlcplus.accessMask & App.AC_VCControl
+                visible: qlcplus.accessMask & App.AC_FixtureEditing
                 onCheckedChanged:
                 {
                     if (checked === true)
-                        switchToContext(vcEntry.ctxName, vcEntry.ctxRes)
+                        switchToContext(prEntry.ctxName, prEntry.ctxRes)
                 }
                 onRightClicked:
                 {
-                    vcEntry.visible = false
-                    contextManager.detachContext("VC")
+                    prEntry.visible = false
+                    contextManager.detachContext("PROGRAMMER")
                 }
             }
             ConsoleWindowKey
@@ -822,14 +825,37 @@ Rectangle
                     contextManager.detachContext("IOMGR")
                 }
             }
+            ConsoleWindowKey
+            {
+                id: vcEntry
+                property string ctxName: "VC"
+                property string ctxRes: "qrc:/VirtualConsole.qml"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                entryText: qsTr("Console")
+                keyHint: "F7"
+                ButtonGroup.group: menuBarGroup
+                visible: qlcplus.accessMask & App.AC_VCControl
+                onCheckedChanged:
+                {
+                    if (checked === true)
+                        switchToContext(vcEntry.ctxName, vcEntry.ctxRes)
+                }
+                onRightClicked:
+                {
+                    vcEntry.visible = false
+                    contextManager.detachContext("VC")
+                }
+            }
         }
 
         Shortcut { sequence: "F1"; onActivated: fnfEntry.checked = true }
-        Shortcut { sequence: "F2"; enabled: vcEntry.visible; onActivated: vcEntry.checked = true }
+        Shortcut { sequence: "F2"; enabled: prEntry.visible; onActivated: prEntry.checked = true }
         Shortcut { sequence: "F3"; enabled: pbEntry.visible; onActivated: pbEntry.checked = true }
         Shortcut { sequence: "F4"; enabled: sdEntry.visible; onActivated: sdEntry.checked = true }
         Shortcut { sequence: "F5"; enabled: smEntry.visible; onActivated: smEntry.checked = true }
         Shortcut { sequence: "F6"; enabled: ioEntry.visible; onActivated: ioEntry.checked = true }
+        Shortcut { sequence: "F7"; enabled: vcEntry.visible; onActivated: vcEntry.checked = true }
     }
 
     Loader

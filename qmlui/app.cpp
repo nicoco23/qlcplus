@@ -46,6 +46,8 @@
 #include "uimanager.h"
 #include "simpledesk.h"
 #include "playbackmanager.h"
+#include "programmermanager.h"
+#include "kahostageimport.h"
 
 /** Name shown in the window title bar (KAHO fork). APPNAME is kept for
  *  settings paths and file compatibility with QLC+ */
@@ -115,6 +117,8 @@ App::App()
     , m_showManager(nullptr)
     , m_simpleDesk(nullptr)
     , m_playbackManager(nullptr)
+    , m_programmerManager(nullptr)
+    , m_kahoStageImport(nullptr)
     , m_videoProvider(nullptr)
     , m_networkManager(nullptr)
     , m_uiManager(nullptr)
@@ -221,6 +225,9 @@ void App::startup()
     m_virtualConsole = new VirtualConsole(this, m_doc, m_contextManager);
     m_showManager = new ShowManager(this, m_doc);
     m_playbackManager = new PlaybackManager(this, m_doc);
+    m_programmerManager = new ProgrammerManager(this, m_doc, m_contextManager, m_playbackManager);
+    m_kahoStageImport = new KahoStageImport(m_doc, m_contextManager, this);
+    rootContext()->setContextProperty("kahoStage", m_kahoStageImport);
     connect(m_showManager, &ShowManager::itemClicked, m_contextManager, &ContextManager::setLastClickedType);
 
     m_networkManager = new NetworkManager(this, m_doc, m_virtualConsole, m_simpleDesk);
@@ -252,6 +259,7 @@ void App::startup()
     m_contextManager->registerContext(m_showManager);
     m_contextManager->registerContext(m_ioManager);
     m_contextManager->registerContext(m_playbackManager);
+    m_contextManager->registerContext(m_programmerManager);
 
     // register an uncreatable type just to use the enums in QML
     qmlRegisterUncreatableType<ContextManager>("org.qlcplus.classes", 1, 0, "ContextManager", "Can't create a ContextManager!");

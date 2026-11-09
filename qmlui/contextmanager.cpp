@@ -231,8 +231,8 @@ void ContextManager::switchToContext(QString name)
 {
     QString ctxName = name;
     QStringList qlc4names, qlc5names;
-    qlc4names << "FixtureManager" << "FunctionManager" << "ShowManager" << "VirtualConsole" << "SimpleDesk" << "InputOutputManager" << "Playbacks";
-    qlc5names << "FIXANDFUNC" << "FIXANDFUNC" << "SHOWMGR" << "VC" << "SDESK" << "IOMGR" << "PLAYBACKS";
+    qlc4names << "FixtureManager" << "FunctionManager" << "ShowManager" << "VirtualConsole" << "SimpleDesk" << "InputOutputManager" << "Playbacks" << "Programmer";
+    qlc5names << "FIXANDFUNC" << "FIXANDFUNC" << "SHOWMGR" << "VC" << "SDESK" << "IOMGR" << "PLAYBACKS" << "PROGRAMMER";
 
     int ctxIndex = qlc5names.indexOf(name);
     if (ctxIndex < 0)
@@ -1996,6 +1996,24 @@ void ContextManager::dumpDmxChannels(quint32 channelMask, QString sceneName, int
 {
     m_functionManager->dumpDmxValues(m_dumpValues, allChannels ? QList<quint32>() : selectedFixtureIDList(), channelMask,
                                      sceneName, sceneID == -1 ? Function::invalidId() : sceneID, nonZeroOnly);
+}
+
+void ContextManager::unsetDumpChannels(const QList<SceneValue> &channels)
+{
+    bool changed = false;
+    for (const SceneValue &sv : channels)
+    {
+        if (m_source)
+            m_source->unset(sv.fxi, sv.channel);
+        int idx = m_dumpValues.indexOf(sv);
+        if (idx >= 0)
+        {
+            m_dumpValues.removeAt(idx);
+            changed = true;
+        }
+    }
+    if (changed)
+        emit dumpValuesCountChanged();
 }
 
 void ContextManager::resetDumpValues()

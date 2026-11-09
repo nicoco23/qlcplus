@@ -50,6 +50,8 @@ set(SRC_FILES
     modelselector.cpp modelselector.h
     palettemanager.cpp palettemanager.h
     playbackmanager.cpp playbackmanager.h
+    programmermanager.cpp programmermanager.h
+    kahostageimport.cpp kahostageimport.h
     previewcontext.cpp previewcontext.h
     rgbmatrixeditor.cpp rgbmatrixeditor.h
     sceneeditor.cpp sceneeditor.h

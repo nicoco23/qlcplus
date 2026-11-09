@@ -384,6 +384,12 @@ public:
     /** Resets the current values used for dumping or preview */
     Q_INVOKABLE void resetDumpValues();
 
+    /** KAHO: the values currently held by the programmer (dump values) */
+    QList<SceneValue> dumpValues() const { return m_dumpValues; }
+
+    /** KAHO: release some programmer channels (stop their output and forget them) */
+    void unsetDumpChannels(const QList<SceneValue> &channels);
+
     /** Return a list only of the fixture IDs from the selected preview items */
     QList<quint32> selectedFixtureIDList() const;
 

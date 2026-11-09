@@ -31,6 +31,8 @@ class MainView2D;
 class ShowManager;
 class SimpleDesk;
 class PlaybackManager;
+class ProgrammerManager;
+class KahoStageImport;
 class UiManager;
 class ActionManager;
 class FixtureBrowser;
@@ -258,6 +260,8 @@ private:
     ShowManager *m_showManager;
     SimpleDesk *m_simpleDesk;
     PlaybackManager *m_playbackManager;
+    ProgrammerManager *m_programmerManager;
+    KahoStageImport *m_kahoStageImport;
     ActionManager *m_actionManager;
     VideoProvider *m_videoProvider;
     NetworkManager *m_networkManager;

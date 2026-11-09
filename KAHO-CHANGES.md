@@ -37,6 +37,20 @@ the fork changes. All original copyright notices are kept.
   warning (level / flashing BLACKOUT) next to it. Simple Desk held channels
   use a soft tint and a red marker instead of a solid red strip
   (`qmlui/qml/SimpleDesk.qml`).
+- **Programmer window** (`qmlui/programmermanager.*`, `qmlui/qml/Programmer.qml`, F2):
+  MagicQ style programmer. Fixture group keys (SHIFT to add), odd/even
+  selection, intensity, strobe, colour swatches and hue bar, pan/tilt pad
+  with position presets and fan spread, zoom, ready made effects (relative
+  EFX for movement, RGB matrices for colour and intensity) with tempo and
+  size, and RECORD: the programmer becomes a Scene (plus a Collection with
+  the effects) placed on the first free playback or armed to be placed by
+  hand. Uses the existing ContextManager dump values as the programmer;
+  `ContextManager::dumpValues()` and `ContextManager::unsetDumpChannels()`
+  were added for it. The Virtual Console key moves to F7.
+- **KahoStage scene import** (`qmlui/kahostageimport.*`, Actions menu > File):
+  reads the `KahoStage-scene.json` written by the KahoStage Minecraft plugin
+  and places the fixtures (matched by name) and the trusses in the 2D / 3D
+  views of the current project, without touching the programming.
 - **Console layout**: slim status bar on top (KAHO wordmark opening the
   Actions menu, current window, clock, BPM), big window keys at the bottom
   (`qmlui/qml/ConsoleWindowKey.qml`) with F1-F6 shortcuts, instead of the
