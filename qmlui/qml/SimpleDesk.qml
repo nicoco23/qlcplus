@@ -34,6 +34,31 @@ Rectangle
     property bool dmxValues: true
     property real maxValue: 255
 
+    /* KAHO flat key */
+    component DeskKey: Rectangle
+    {
+        id: dk
+        property string text: ""
+        property color textColor: UISettings.fgMain
+        property bool lit: false
+        property bool radiusLeft: false
+        signal clicked()
+        radius: 5
+        color: lit ? UISettings.kahoMauve : (dkArea.pressed ? UISettings.bgLight : (dkArea.containsMouse ? UISettings.bgControl : UISettings.bgMedium))
+        border.color: lit ? UISettings.kahoMauveSoft : UISettings.borderColorDark
+        opacity: enabled ? 1 : 0.4
+        Text
+        {
+            anchors.centerIn: parent
+            text: dk.text
+            color: dk.lit ? UISettings.bgStronger : dk.textColor
+            font.family: UISettings.titleFontName
+            font.pixelSize: UISettings.textSizeDefault * 0.65
+            font.letterSpacing: 0.5
+        }
+        MouseArea { id: dkArea; anchors.fill: parent; hoverEnabled: true; onClicked: dk.clicked() }
+    }
+
     ChannelToolLoader
     {
         id: channelToolLoader
@@ -55,43 +80,50 @@ Rectangle
         handle: Rectangle
         {
             implicitHeight: screenPixelDensity * UISettings.scalingFactor * 0.9
-            color: SplitHandle.hovered || SplitHandle.pressed ? UISettings.highlight : UISettings.bgLighter
+            color: SplitHandle.hovered || SplitHandle.pressed ? UISettings.highlight : UISettings.bgControl
         }
 
         // Top view (faders)
         Rectangle
         {
             SplitView.minimumHeight: sDeskContainer.height * 0.2
-            SplitView.preferredHeight: sDeskContainer.height * 0.6
-            SplitView.maximumHeight: sDeskContainer.height * 0.8
+            SplitView.preferredHeight: sDeskContainer.height * 0.66
+            SplitView.maximumHeight: sDeskContainer.height * 0.85
 
-            color: "transparent"
+            color: UISettings.bgStronger
 
             Rectangle
             {
                 id: viewToolbar
                 width: parent.width
-                height: UISettings.iconSizeDefault
+                height: UISettings.iconSizeDefault * 0.95
                 z: 10
-                gradient: Gradient
-                {
-                    GradientStop { position: 0; color: UISettings.toolbarStartSub }
-                    GradientStop { position: 1; color: UISettings.toolbarEnd }
-                }
+                color: UISettings.bgStrong
+
+                Rectangle { width: parent.width; height: 1; anchors.bottom: parent.bottom; color: UISettings.borderColorDark }
 
                 RowLayout
                 {
                     anchors.fill: parent
-                    spacing: 5
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 8
+                    anchors.topMargin: 5
+                    anchors.bottomMargin: 5
+                    spacing: 8
 
-                    RobotoText
+                    Text
                     {
-                        label: qsTr("Universe")
+                        text: qsTr("UNIVERS")
+                        color: UISettings.consoleAccent
+                        font.family: UISettings.titleFontName
+                        font.pixelSize: UISettings.textSizeDefault * 0.75
+                        font.letterSpacing: 1
                     }
 
                     CustomComboBox
                     {
                         id: viewUniverseCombo
+                        Layout.fillHeight: true
                         implicitWidth: UISettings.bigItemHeight * 2
                         padding: 0
                         model: simpleDesk.universesListModel
@@ -99,37 +131,85 @@ Rectangle
                         onValueChanged: (value) => simpleDesk.universeFilter = value
                     }
 
-                    // universe reset button
-                    IconButton
+                    Rectangle { Layout.fillHeight: true; Layout.preferredWidth: 1; color: UISettings.bgControl }
+
+                    // channels held by the desk
+                    Rectangle
                     {
-                        faSource: FontAwesome.fa_xmark
-                        faColor: UISettings.bgControl
-                        tooltip: qsTr("Reset the whole universe")
-                        onClicked:
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: heldRow.implicitWidth + 20
+                        radius: height / 2
+                        color: simpleDesk.overrideCount > 0
+                               ? Qt.rgba(UISettings.consoleRelease.r, UISettings.consoleRelease.g, UISettings.consoleRelease.b, 0.15)
+                               : "transparent"
+                        border.color: simpleDesk.overrideCount > 0 ? UISettings.consoleRelease : UISettings.bgControl
+
+                        Row
                         {
-                            simpleDesk.resetUniverse(viewUniverseCombo.currentIndex)
+                            id: heldRow
+                            anchors.centerIn: parent
+                            spacing: 6
+                            Rectangle
+                            {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 8; height: 8; radius: 4
+                                color: simpleDesk.overrideCount > 0 ? UISettings.consoleRelease : UISettings.bgLight
+                            }
+                            Text
+                            {
+                                text: simpleDesk.overrideCount > 0
+                                      ? simpleDesk.overrideCount + (simpleDesk.overrideCount > 1 ? qsTr(" canaux tenus") : qsTr(" canal tenu"))
+                                      : qsTr("aucun canal tenu")
+                                color: simpleDesk.overrideCount > 0 ? UISettings.consoleRelease : UISettings.fgMedium
+                                font.family: UISettings.robotoFontName
+                                font.pixelSize: UISettings.textSizeDefault * 0.7
+                            }
                         }
                     }
 
-                    Rectangle { Layout.fillWidth: true; color: "transparent" }
-
-                    // DMX/Percentage button
-                    DMXPercentageButton
+                    DeskKey
                     {
-                        height: parent.height - 2
-                        dmxMode: dmxValues
-                        onClicked:
+                        Layout.fillHeight: true
+                        Layout.preferredWidth: UISettings.bigItemHeight * 1.5
+                        text: qsTr("LIBÉRER L'UNIVERS")
+                        textColor: UISettings.consoleRelease
+                        enabled: simpleDesk.overrideCount > 0
+                        onClicked: simpleDesk.resetUniverse(viewUniverseCombo.currentIndex)
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Text
+                    {
+                        text: qsTr("Clic sur l'icône d'un canal : ses réglages · molette sur un fader : réglage fin")
+                        color: UISettings.bgLighter
+                        font.family: UISettings.robotoFontName
+                        font.pixelSize: UISettings.textSizeDefault * 0.6
+                        elide: Text.ElideRight
+                        Layout.maximumWidth: parent.width * 0.3
+                    }
+
+                    // DMX / percentage
+                    Row
+                    {
+                        Layout.fillHeight: true
+                        spacing: 0
+                        DeskKey
                         {
-                            if (dmxValues)
-                            {
-                                dmxValues = false
-                                maxValue = 100
-                            }
-                            else
-                            {
-                                maxValue = 255
-                                dmxValues = true
-                            }
+                            height: parent.height
+                            width: UISettings.bigItemHeight * 0.55
+                            text: "0-255"
+                            lit: dmxValues
+                            radiusLeft: true
+                            onClicked: { maxValue = 255; dmxValues = true }
+                        }
+                        DeskKey
+                        {
+                            height: parent.height
+                            width: UISettings.bigItemHeight * 0.45
+                            text: "%"
+                            lit: !dmxValues
+                            onClicked: { dmxValues = false; maxValue = 100 }
                         }
                     }
                 }
@@ -183,69 +263,109 @@ Rectangle
                 }
 
                 delegate:
-                    Rectangle
+                    Item
                     {
                         id: chRoot
-                        implicitWidth: UISettings.iconSizeDefault
+                        implicitWidth: UISettings.iconSizeDefault * 1.05
                         height: channelView.height - sbar.height
-                        color: {
-                            if (isOverride)
-                            {
-                                // KAHO: soft programmer tint instead of a solid red strip
-                                return Qt.rgba(UISettings.consoleRelease.r, UISettings.consoleRelease.g, UISettings.consoleRelease.b, 0.2)
-                            }
-                            else
-                            {
-                                switch (chDisplay)
-                                {
-                                    case SimpleDesk.None: return "transparent"
-                                    case SimpleDesk.Odd: return UISettings.bgFixtureOdd
-                                    case SimpleDesk.Even: return UISettings.bgFixtureEven
-                                }
-                            }
-                        }
-                        border.width: 1
-                        border.color: UISettings.borderColorDark
+                        // the first channel of a fixture draws the fixture name over its neighbours
+                        z: isFirst ? 3 : 1
 
                         property Fixture fixtureObj: model.cRef
                         property int chDisplay: model.chDisplay
                         property bool isOverride: model.isOverride
+                        readonly property bool isFirst: fixtureObj !== null && model.chIndex === 0
+                        readonly property color chColor: fixtureObj ? simpleDesk.channelColor(fixtureObj.id, model.chIndex) : UISettings.kahoMauve
+                        readonly property color bandColor: chDisplay === SimpleDesk.Odd ? UISettings.kahoMauveDeep
+                                                         : (chDisplay === SimpleDesk.Even ? "#2a2440" : UISettings.bgMedium)
 
-                        // KAHO: "held by the desk" marker
                         Rectangle
                         {
-                            visible: chRoot.isOverride
-                            width: parent.width
-                            height: 3
-                            color: UISettings.consoleRelease
+                            id: card
+                            anchors.fill: parent
+                            anchors.margins: 1
+                            radius: 5
+                            color: chRoot.isOverride ? Qt.rgba(UISettings.consoleRelease.r, UISettings.consoleRelease.g, UISettings.consoleRelease.b, 0.12)
+                                                     : (chDisplay === SimpleDesk.Odd ? UISettings.bgFixtureOdd
+                                                        : (chDisplay === SimpleDesk.Even ? UISettings.bgFixtureEven : UISettings.bgStrong))
+                            border.color: chRoot.isOverride ? Qt.rgba(UISettings.consoleRelease.r, UISettings.consoleRelease.g, UISettings.consoleRelease.b, 0.6)
+                                                            : UISettings.borderColorDark
                         }
 
                         ColumnLayout
                         {
-                            width: parent.width - 2
-                            height: parent.height
+                            anchors.fill: parent
+                            anchors.margins: 1
+                            spacing: 3
 
-                            // channel icon
-                            IconButton
+                            // fixture band (name on the first channel)
+                            Rectangle
                             {
-                                width: UISettings.iconSizeMedium
-                                Layout.alignment: Qt.AlignHCenter
-                                height: width
-                                border.width: 0
-                                tooltip: fixtureObj ? fixtureManager.channelName(fixtureObj.id, model.chIndex) : ""
-                                imgSource: fixtureObj ? fixtureManager.channelIcon(fixtureObj.id, model.chIndex) : ""
-                                visible: fixtureObj ? true : false
-                                focusPolicy: Qt.ClickFocus
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: UISettings.listItemHeight * 0.7
+                                radius: 5
+                                color: chRoot.isOverride ? UISettings.consoleRelease : chRoot.bandColor
 
-                                onClicked:
+                                // square the bottom corners
+                                Rectangle { width: parent.width; height: parent.radius; anchors.bottom: parent.bottom; color: parent.color }
+
+                                Text
                                 {
-                                    if (fixtureObj)
-                                        channelToolLoader.loadChannelTool(this, fixtureObj.id, model.chIndex, model.chValue)
+                                    visible: chRoot.isFirst
+                                    x: 6
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: chRoot.fixtureObj ? chRoot.fixtureObj.channels * chRoot.width - 12 : 0
+                                    text: chRoot.fixtureObj ? chRoot.fixtureObj.name : ""
+                                    elide: Text.ElideRight
+                                    color: chRoot.isOverride ? UISettings.bgStronger : UISettings.kahoMauveSoft
+                                    font.family: UISettings.titleFontName
+                                    font.pixelSize: UISettings.textSizeDefault * 0.62
+                                    font.letterSpacing: 0.5
                                 }
+                            }
 
-                                Keys.onPressed: (event) => {
-                                    if (event.key === Qt.Key_Escape)
-                                        channelToolLoader.visible = false
+                            // channel type (opens the channel tool)
+                            Rectangle
+                            {
+                                Layout.alignment: Qt.AlignHCenter
+                                Layout.preferredWidth: chRoot.width * 0.72
+                                Layout.preferredHeight: width * 0.8
+                                radius: 5
+                                visible: chRoot.fixtureObj ? true : false
+                                color: iconArea.containsMouse ? UISettings.bgLight : UISettings.bgControl
+                                border.color: Qt.darker(chRoot.chColor, 1.4)
+
+                                Image
+                                {
+                                    anchors.centerIn: parent
+                                    width: parent.height * 0.75
+                                    height: width
+                                    sourceSize: Qt.size(width, height)
+                                    source: chRoot.fixtureObj ? fixtureManager.channelIcon(chRoot.fixtureObj.id, model.chIndex) : ""
+                                }
+                                Rectangle
+                                {
+                                    anchors.bottom: parent.bottom
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    anchors.bottomMargin: 2
+                                    width: parent.width * 0.5
+                                    height: 2
+                                    radius: 1
+                                    color: chRoot.chColor
+                                }
+                                MouseArea
+                                {
+                                    id: iconArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onClicked:
+                                    {
+                                        if (chRoot.fixtureObj)
+                                            channelToolLoader.loadChannelTool(parent, chRoot.fixtureObj.id, model.chIndex, model.chValue)
+                                    }
+                                    ToolTip.visible: containsMouse && chRoot.fixtureObj
+                                    ToolTip.delay: 400
+                                    ToolTip.text: chRoot.fixtureObj ? chRoot.fixtureObj.name + " · " + simpleDesk.channelShortName(chRoot.fixtureObj.id, model.chIndex) : ""
                                 }
                             }
 
@@ -253,18 +373,19 @@ Rectangle
                             QLCPlusFader
                             {
                                 padding: 0
-                                width: parent.width * 0.95
+                                Layout.preferredWidth: chRoot.width * 0.9
                                 Layout.alignment: Qt.AlignHCenter
                                 Layout.fillHeight: true
                                 focusPolicy: Qt.NoFocus
                                 from: 0
                                 to: 255
                                 value: model.chValue
+                                trackColor: chRoot.chColor
                                 onMoved:
                                 {
                                     model.isOverride = true
                                     model.chValue = valueAt(position)
-                                    simpleDesk.setValue(fixtureObj ? fixtureObj.id : -1, fixtureObj ? model.chIndex : index, model.chValue)
+                                    simpleDesk.setValue(chRoot.fixtureObj ? chRoot.fixtureObj.id : -1, chRoot.fixtureObj ? model.chIndex : index, model.chValue)
                                 }
                             }
 
@@ -272,7 +393,8 @@ Rectangle
                             CustomSpinBox
                             {
                                 id: chValueSpin
-                                implicitWidth: UISettings.iconSizeDefault
+                                Layout.alignment: Qt.AlignHCenter
+                                implicitWidth: chRoot.width - 6
                                 height: UISettings.listItemHeight * 0.75
                                 from: 0
                                 to: maxValue
@@ -285,35 +407,54 @@ Rectangle
                                 {
                                     model.isOverride = true
                                     model.chValue = value * (dmxValues ? 1.0 : 2.55)
-                                    simpleDesk.setValue(fixtureObj ? fixtureObj.id : -1, fixtureObj ? model.chIndex : index, model.chValue)
+                                    simpleDesk.setValue(chRoot.fixtureObj ? chRoot.fixtureObj.id : -1, chRoot.fixtureObj ? model.chIndex : index, model.chValue)
                                 }
                             }
 
                             // DMX address
-                            RobotoText
+                            Text
                             {
                                 Layout.alignment: Qt.AlignHCenter
-                                height: UISettings.listItemHeight * 0.75
-                                // Item.focusPolicy exists only from Qt 6.7
-                                Component.onCompleted: if ("focusPolicy" in this) focusPolicy = Qt.NoFocus
-                                fontSize: UISettings.textSizeDefault
-                                labelColor: chRoot.isOverride ? UISettings.consoleRelease : UISettings.fgMain
-                                fontBold: true
-                                label: index + 1
+                                text: index + 1
+                                color: chRoot.isOverride ? UISettings.consoleRelease : UISettings.fgMedium
+                                font.family: UISettings.titleFontName
+                                font.pixelSize: UISettings.textSizeDefault * 0.7
                             }
 
-                            // channel reset button
-                            IconButton
+                            // release the channel (only when the desk holds it)
+                            Rectangle
                             {
-                                faSource: FontAwesome.fa_xmark
-                                faColor: chRoot.isOverride ? UISettings.consoleRelease : UISettings.bgControl
-                                tooltip: qsTr("Reset the channel")
-                                focusPolicy: Qt.NoFocus
-                                onClicked:
+                                Layout.alignment: Qt.AlignHCenter
+                                Layout.bottomMargin: 4
+                                Layout.preferredWidth: chRoot.width * 0.62
+                                Layout.preferredHeight: UISettings.listItemHeight * 0.62
+                                radius: height / 2
+                                opacity: chRoot.isOverride ? 1 : 0
+                                color: relArea.containsMouse ? UISettings.consoleRelease : "transparent"
+                                border.color: UISettings.consoleRelease
+                                Text
                                 {
-                                    var channel = index - (fixtureObj ? fixtureObj.address : 0)
-                                    simpleDesk.unsetDumpValue(fixtureObj ? fixtureObj.id : -1, channel)
-                                    simpleDesk.resetChannel(index)
+                                    anchors.centerIn: parent
+                                    text: "×"
+                                    color: relArea.containsMouse ? UISettings.bgStronger : UISettings.consoleRelease
+                                    font.pixelSize: parent.height * 0.8
+                                    font.bold: true
+                                }
+                                MouseArea
+                                {
+                                    id: relArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    enabled: chRoot.isOverride
+                                    onClicked:
+                                    {
+                                        var channel = index - (chRoot.fixtureObj ? chRoot.fixtureObj.address : 0)
+                                        simpleDesk.unsetDumpValue(chRoot.fixtureObj ? chRoot.fixtureObj.id : -1, channel)
+                                        simpleDesk.resetChannel(index)
+                                    }
+                                    ToolTip.visible: containsMouse
+                                    ToolTip.delay: 400
+                                    ToolTip.text: qsTr("Relâcher ce canal")
                                 }
                             }
                         }
@@ -338,14 +479,24 @@ Rectangle
                 width: parent.width / 2
                 height: parent.height
 
-                RobotoText
+                Rectangle
                 {
                     id: fixtureHeader
                     z: 2
                     width: parent.width
-                    color: UISettings.sectionHeader
-                    label: qsTr("Fixture List")
-                    leftMargin: 5
+                    height: UISettings.listItemHeight * 0.85
+                    color: UISettings.bgStrong
+                    Text
+                    {
+                        x: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: qsTr("Machines").toUpperCase()
+                        color: UISettings.consoleAccent
+                        font.family: UISettings.titleFontName
+                        font.pixelSize: UISettings.textSizeDefault * 0.7
+                        font.letterSpacing: 1
+                    }
+                    Rectangle { width: parent.width; height: 1; anchors.bottom: parent.bottom; color: UISettings.borderColorDark }
                 }
 
                 ListView
@@ -406,21 +557,24 @@ Rectangle
                 width: parent.width / 2
                 height: parent.height
 
-                RobotoText
+                Rectangle
                 {
                     id: historyHeader
                     z: 2
                     width: parent.width - keypad.width
-                    leftMargin: 7
-                    color: UISettings.sectionHeader
-                    label: qsTr("Commands history")
-
-                    Rectangle
+                    height: UISettings.listItemHeight * 0.85
+                    color: UISettings.bgStrong
+                    Text
                     {
-                        width: 2
-                        height: parent.height
-                        color: UISettings.bgLight
+                        x: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: qsTr("Historique des commandes").toUpperCase()
+                        color: UISettings.consoleAccent
+                        font.family: UISettings.titleFontName
+                        font.pixelSize: UISettings.textSizeDefault * 0.7
+                        font.letterSpacing: 1
                     }
+                    Rectangle { width: parent.width; height: 1; anchors.bottom: parent.bottom; color: UISettings.borderColorDark }
                 }
 
                 ListView

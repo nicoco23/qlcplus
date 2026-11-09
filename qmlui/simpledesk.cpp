@@ -30,6 +30,8 @@
 #include "tardis.h"
 #include "app.h"
 #include "doc.h"
+#include "fixture.h"
+#include "qlcchannel.h"
 
 #define UserRoleClassReference  (Qt::UserRole + 1)
 #define UserRoleChannelIndex    (Qt::UserRole + 2)
@@ -277,6 +279,47 @@ int SimpleDesk::overrideCount() const
 {
     QMutexLocker locker(&m_mutex);
     return int(m_values.count());
+}
+
+QColor SimpleDesk::channelColor(quint32 fixtureID, quint32 channel) const
+{
+    Fixture *fxi = m_doc->fixture(fixtureID);
+    const QLCChannel *ch = fxi ? fxi->channel(channel) : nullptr;
+    if (ch == nullptr)
+        return QColor("#a98bff");
+
+    switch (ch->group())
+    {
+        case QLCChannel::Intensity:
+            switch (ch->colour())
+            {
+                case QLCChannel::Red:     return QColor("#ff4d5e");
+                case QLCChannel::Green:   return QColor("#5fd39a");
+                case QLCChannel::Blue:    return QColor("#5b8cff");
+                case QLCChannel::White:   return QColor("#f3f2f6");
+                case QLCChannel::Amber:   return QColor("#ffb86b");
+                case QLCChannel::UV:      return QColor("#b46bff");
+                case QLCChannel::Cyan:    return QColor("#5ad1e6");
+                case QLCChannel::Magenta: return QColor("#ff7ad9");
+                case QLCChannel::Yellow:  return QColor("#ffe066");
+                default:                  return QColor("#e8e6f0");   // dimmer
+            }
+        case QLCChannel::Pan:
+        case QLCChannel::Tilt:    return QColor("#a98bff");
+        case QLCChannel::Shutter: return QColor("#ffe066");
+        case QLCChannel::Beam:
+        case QLCChannel::Prism:   return QColor("#8fd6e8");
+        case QLCChannel::Colour:
+        case QLCChannel::Gobo:    return QColor("#f2a9cf");
+        default:                  return QColor("#a29fac");
+    }
+}
+
+QString SimpleDesk::channelShortName(quint32 fixtureID, quint32 channel) const
+{
+    Fixture *fxi = m_doc->fixture(fixtureID);
+    const QLCChannel *ch = fxi ? fxi->channel(channel) : nullptr;
+    return ch ? ch->name() : QString();
 }
 
 void SimpleDesk::resetAll()

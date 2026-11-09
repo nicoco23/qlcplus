@@ -59,6 +59,12 @@ the fork changes. All original copyright notices are kept.
   case tabs (`MenuBarEntry.qml`), KAHO colours in the 2D view, Input/Output
   patch, Show Manager tracks, check boxes, spin boxes and side panels, and a
   KAHO default background for Virtual Console widgets (`vcwidget.cpp`).
+- **Simple Desk redesign** (`qmlui/qml/SimpleDesk.qml`): channel cards with a
+  fixture band (fixture name on its first channel), coloured channel type key
+  (opens the channel tool), fader filled with the channel colour, release key
+  shown only on held channels, toolbar with held channels count, "release
+  universe" and 0-255 / % switch. `SimpleDesk::channelColor()` and
+  `SimpleDesk::channelShortName()` added for it.
 - **KahoStage scene import** (`qmlui/kahostageimport.*`, Actions menu > File):
   reads the `KahoStage-scene.json` written by the KahoStage Minecraft plugin
   and places the fixtures (matched by name) and the trusses in the 2D / 3D

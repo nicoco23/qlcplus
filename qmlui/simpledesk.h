@@ -25,6 +25,7 @@
 #include "dmxsource.h"
 
 #include <QMutex>
+#include <QColor>
 
 class FunctionManager;
 class GenericFader;
@@ -114,6 +115,11 @@ public:
     Q_INVOKABLE void resetAll();
 
     int overrideCount() const;
+
+    /** KAHO: colour of a channel fader (red channel = red fill, pan/tilt = mauve...) */
+    Q_INVOKABLE QColor channelColor(quint32 fixtureID, quint32 channel) const;
+    /** KAHO: short label of a channel (name of the channel in the fixture definition) */
+    Q_INVOKABLE QString channelShortName(quint32 fixtureID, quint32 channel) const;
 
     /** Web access helpers (absolute address based) */
     int getSlidersNumber() const;
