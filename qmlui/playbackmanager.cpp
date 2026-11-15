@@ -31,6 +31,7 @@
 #include "outputpatch.h"
 #include "inputpatch.h"
 #include "function.h"
+#include "chaserstep.h"
 #include "chaser.h"
 #include "doc.h"
 
@@ -661,6 +662,55 @@ void PlaybackManager::setPageName(int page, const QString &name)
     slotRefresh();
 }
 
+void PlaybackManager::toggleFunction(quint32 functionId)
+{
+    Function *f = functionAt(functionId);
+    if (f == nullptr)
+        return;
+    if (f->isRunning())
+        f->stop(FunctionParent::master());
+    else
+        f->start(m_doc->masterTimer(), FunctionParent::master());
+    slotRefresh();
+}
+
+QVariantList PlaybackManager::cueList(int index)
+{
+    QVariantList list;
+    if (index < 0 || index >= FaderCount)
+        return list;
+    Function *f = functionAt(fader(m_page, index).functionId);
+    if (f == nullptr)
+        return list;
+
+    Chaser *stack = qobject_cast<Chaser *>(f);
+    if (stack == nullptr)
+    {
+        QVariantMap row;
+        row.insert("number", 1);
+        row.insert("name", f->name());
+        row.insert("type", Function::typeToString(f->type()));
+        row.insert("fade", f->fadeInSpeed() / 1000.0);
+        row.insert("current", f->isRunning());
+        list.append(row);
+        return list;
+    }
+    int current = stack->isRunning() ? stack->currentStepIndex() : -1;
+    for (int i = 0; i < stack->stepsCount(); i++)
+    {
+        ChaserStep *step = stack->stepAt(i);
+        Function *sf = step ? functionAt(step->fid) : nullptr;
+        QVariantMap row;
+        row.insert("number", i + 1);
+        row.insert("name", sf ? sf->name() : tr("(supprimé)"));
+        row.insert("type", sf ? Function::typeToString(sf->type()) : QString());
+        row.insert("fade", sf ? sf->fadeInSpeed() / 1000.0 : 0.0);
+        row.insert("current", i == current);
+        list.append(row);
+    }
+    return list;
+}
+
 QString PlaybackManager::pickMode() const
 {
     return m_pickMode;
@@ -807,6 +857,16 @@ void PlaybackManager::slotRefresh()
     {
         m_pagesCache = pages;
         emit pagesChanged();
+    }
+
+    QVariantList runningIds;
+    for (Function *f : m_doc->functions())
+        if (f->isRunning())
+            runningIds.append(f->id());
+    if (runningIds != m_runningIds)
+    {
+        m_runningIds = runningIds;
+        emit runningIdsChanged();
     }
 
     qreal gm = grandMaster();

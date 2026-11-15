@@ -124,6 +124,9 @@ ProgrammerManager::ProgrammerManager(QQuickView *view, Doc *doc, ContextManager 
 
     connect(m_contextManager, &ContextManager::selectedFixturesChanged, this, &ProgrammerManager::slotSelectionChanged);
     connect(m_playbacks, &PlaybackManager::slotPicked, this, &ProgrammerManager::slotSlotPicked);
+    m_sheetTimer.setInterval(200);
+    connect(&m_sheetTimer, &QTimer::timeout, this, &ProgrammerManager::slotRefreshSheet);
+    defaultMemories();
     connect(m_contextManager, &ContextManager::dumpValuesCountChanged, this, &ProgrammerManager::programmerChanged);
     connect(m_doc, &Doc::fixtureGroupAdded, this, &ProgrammerManager::groupsChanged);
     connect(m_doc, &Doc::fixtureGroupRemoved, this, &ProgrammerManager::groupsChanged);
@@ -1087,6 +1090,75 @@ void ProgrammerManager::resetContents()
     m_colorMemories = QVector<Memory>(MemoryCount);
     m_positionMemories = QVector<Memory>(MemoryCount);
     m_pendingCue = Function::invalidId();
+    defaultMemories();
+    emit memoriesChanged();
+}
+
+/** Presets a new project starts with (a saved project brings its own) */
+void ProgrammerManager::defaultMemories()
+{
+    static const struct { const char *name; const char *color; } colours[] =
+    {
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "Rouge"), "#ff2020" }, { QT_TRANSLATE_NOOP("ProgrammerManager", "Orange"), "#ff6a00" },
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "Ambre"), "#ffb000" }, { QT_TRANSLATE_NOOP("ProgrammerManager", "Jaune"), "#fff200" },
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "Vert"), "#40ff30" },  { QT_TRANSLATE_NOOP("ProgrammerManager", "Cyan"), "#00ffd0" },
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "Bleu"), "#0090ff" },  { QT_TRANSLATE_NOOP("ProgrammerManager", "Bleu nuit"), "#2020ff" },
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "KAHO"), "#a98bff" },  { QT_TRANSLATE_NOOP("ProgrammerManager", "Violet"), "#9000ff" },
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "Magenta"), "#ff00c8" }, { QT_TRANSLATE_NOOP("ProgrammerManager", "Blanc"), "#ffffff" },
+    };
+    int i = 0;
+    for (const auto &c : colours)
+    {
+        Memory &m = m_colorMemories[i++];
+        m.used = true;
+        m.name = tr(c.name);
+        m.color = QColor(c.color);
+    }
+
+    static const struct { const char *name; qreal pan, tilt, fan; bool crossed; } positions[] =
+    {
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "Centre"), 0, 0, 0, false },
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "Face"), 0, 45, 0, false },
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "Public"), 0, 75, 0, false },
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "Horizon"), 0, 90, 0, false },
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "Éventail"), 0, 45, 60, false },
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "Éventail +"), 0, 70, 120, false },
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "Croisé"), 0, 45, 50, true },
+        { QT_TRANSLATE_NOOP("ProgrammerManager", "Arrière"), 0, -45, 0, false },
+    };
+    i = 0;
+    for (const auto &p : positions)
+    {
+        Memory &m = m_positionMemories[i++];
+        m.used = true;
+        m.name = tr(p.name);
+        m.pan = p.pan; m.tilt = p.tilt; m.fan = p.fan; m.crossed = p.crossed;
+    }
+}
+
+bool ProgrammerManager::memoryStore(const QString &kind, int index)
+{
+    QVector<Memory> &list = kind == "color" ? m_colorMemories : m_positionMemories;
+    if (index < 0 || index >= list.count())
+        return false;
+    if (kind == "color" && m_lastColor.isValid() == false)
+        return false;
+    QString keep = list[index].used ? list[index].name : QString();
+    list[index] = Memory();
+    memoryPress(kind, index);       // empty slot: stores
+    if (keep.isEmpty() == false && kind != "color")
+        list[index].name = keep;
+    emit memoriesChanged();
+    return true;
+}
+
+void ProgrammerManager::memoryRename(const QString &kind, int index, const QString &name)
+{
+    QVector<Memory> &list = kind == "color" ? m_colorMemories : m_positionMemories;
+    if (index < 0 || index >= list.count() || list[index].used == false || name.trimmed().isEmpty())
+        return;
+    list[index].name = name.trimmed();
+    m_doc->setModified();
     emit memoriesChanged();
 }
 
@@ -1095,7 +1167,8 @@ bool ProgrammerManager::loadXML(QXmlStreamReader &root)
     if (root.name() != KXMLQLCProgrammer)
         return false;
 
-    resetContents();
+    m_colorMemories = QVector<Memory>(MemoryCount);
+    m_positionMemories = QVector<Memory>(MemoryCount);
     while (root.readNextStartElement())
     {
         if (root.name() == QLatin1String("Memory"))

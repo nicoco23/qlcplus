@@ -24,6 +24,8 @@
 #include <QVariantList>
 #include <QColor>
 #include <QMap>
+#include <QTimer>
+#include <QStringList>
 
 #include "previewcontext.h"
 
@@ -64,6 +66,11 @@ class ProgrammerManager final : public PreviewContext
     Q_PROPERTY(qreal cueFade READ cueFade WRITE setCueFade NOTIFY cueFadeChanged)
     Q_PROPERTY(QVariantList colorMemories READ colorMemories NOTIFY memoriesChanged)
     Q_PROPERTY(QVariantList positionMemories READ positionMemories NOTIFY memoriesChanged)
+    Q_PROPERTY(QVariantList fixtureSheet READ fixtureSheet NOTIFY fixtureSheetChanged)
+    Q_PROPERTY(bool sheetActive READ sheetActive WRITE setSheetActive NOTIFY sheetActiveChanged)
+    Q_PROPERTY(QStringList commandLog READ commandLog NOTIFY commandLogChanged)
+    Q_PROPERTY(QString commandFeedback READ commandFeedback NOTIFY commandLogChanged)
+    Q_PROPERTY(bool commandFailed READ commandFailed NOTIFY commandLogChanged)
 
 public:
     ProgrammerManager(QQuickView *view, Doc *doc, ContextManager *ctx,
@@ -138,12 +145,28 @@ public:
     void setCueFade(qreal seconds);
 
     /* Memories: user colour and position palettes (saved in the project) */
-    static const int MemoryCount = 8;
+    static const int MemoryCount = 16;
     QVariantList colorMemories() const;
     QVariantList positionMemories() const;
     /** Recall a memory, or store the current colour / position in an empty one */
     Q_INVOKABLE void memoryPress(const QString &kind, int index);
     Q_INVOKABLE void memoryClear(const QString &kind, int index);
+    /** Store the current colour / position in a preset, replacing what it held */
+    Q_INVOKABLE bool memoryStore(const QString &kind, int index);
+    Q_INVOKABLE void memoryRename(const QString &kind, int index, const QString &name);
+
+    /* Fixture sheet: one row per fixture with its live output, refreshed while a view shows it */
+    QVariantList fixtureSheet() const { return m_sheet; }
+    bool sheetActive() const { return m_sheetTimer.isActive(); }
+    void setSheetActive(bool active);
+    /** Select a fixture from the sheet (additive = keep the current selection) */
+    Q_INVOKABLE void selectFixture(quint32 fixtureId, bool additive);
+
+    /* Command line ("Group 1 At 50", "Store Exec 2", "Go 3"...) */
+    Q_INVOKABLE QString executeCommand(const QString &command);
+    QStringList commandLog() const { return m_commandLog; }
+    QString commandFeedback() const { return m_commandFeedback; }
+    bool commandFailed() const { return m_commandFailed; }
 
     void resetContents();
     bool loadXML(QXmlStreamReader &root);
@@ -159,10 +182,14 @@ signals:
     void recorded(QString name, QString where);
     void cueFadeChanged();
     void memoriesChanged();
+    void fixtureSheetChanged();
+    void sheetActiveChanged();
+    void commandLogChanged();
 
 private slots:
     void slotSelectionChanged();
     void slotSlotPicked(QString mode, bool isFader, int index, quint32 functionId);
+    void slotRefreshSheet();
 
 private:
     QList<quint32> selectedFixtures() const;
@@ -187,6 +214,9 @@ private:
     void resetAfterRecord();
     void appendToSlot(bool isFader, int index, quint32 slotFid);
     void updateSlot(bool isFader, int index, quint32 slotFid);
+    void defaultMemories();
+    QString runCommand(const QStringList &tokens, bool &ok);
+    void selectIds(const QList<quint32> &ids, bool additive, bool remove);
 
 private:
     ContextManager *m_contextManager;
@@ -215,6 +245,13 @@ private:
 
     QVector<Memory> m_colorMemories;
     QVector<Memory> m_positionMemories;
+
+    QTimer m_sheetTimer;
+    QVariantList m_sheet;
+
+    QStringList m_commandLog;
+    QString m_commandFeedback;
+    bool m_commandFailed = false;
 };
 
 #endif // PROGRAMMERMANAGER_H

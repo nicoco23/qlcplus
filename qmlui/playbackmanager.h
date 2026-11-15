@@ -59,6 +59,7 @@ class PlaybackManager final : public PreviewContext
     Q_PROPERTY(QVariantList functionsList READ functionsList NOTIFY functionsListChanged)
     Q_PROPERTY(quint32 armedFunction READ armedFunction WRITE setArmedFunction NOTIFY armedFunctionChanged)
     Q_PROPERTY(QString pickMode READ pickMode WRITE setPickMode NOTIFY pickModeChanged)
+    Q_PROPERTY(QVariantList runningIds READ runningIds NOTIFY runningIdsChanged)
 
 public:
     static const int PageCount = 8;      // one per APC mini scene button
@@ -128,6 +129,13 @@ public:
     void setPickMode(const QString &mode);
     Q_INVOKABLE void pickSlot(bool isFader, int index);
 
+    /** IDs of the functions currently running (sequence pool) */
+    QVariantList runningIds() const { return m_runningIds; }
+    /** Start or stop a function directly from the sequence pool */
+    Q_INVOKABLE void toggleFunction(quint32 functionId);
+    /** Cues of a playback of the current page: one row per step of a cue stack */
+    Q_INVOKABLE QVariantList cueList(int index);
+
     /** Function held by a slot of the current page */
     quint32 slotFunction(bool isFader, int index);
     /** Put another function on a slot, keeping its name and colour */
@@ -150,6 +158,7 @@ signals:
     void functionsListChanged();
     void armedFunctionChanged();
     void pickModeChanged();
+    void runningIdsChanged();
     void slotPicked(QString mode, bool isFader, int index, quint32 functionId);
 
 private slots:
@@ -205,6 +214,7 @@ private:
     QStringList m_pageNames;        // PageCount
     quint32 m_armedFunction;
     QString m_pickMode;
+    QVariantList m_runningIds;
 
     QVariantList m_fadersCache;
     QVariantList m_execsCache;

@@ -261,6 +261,12 @@ void App::startup()
     m_contextManager->registerContext(m_playbackManager);
     m_contextManager->registerContext(m_programmerManager);
 
+    /* KAHO: the pools screen has no state of its own, a plain context is enough */
+    PreviewContext *poolsContext = new PreviewContext(this, m_doc, "POOLS", this);
+    poolsContext->setContextResource("qrc:/Pools.qml");
+    poolsContext->setContextTitle(tr("Pools"));
+    m_contextManager->registerContext(poolsContext);
+
     // register an uncreatable type just to use the enums in QML
     qmlRegisterUncreatableType<ContextManager>("org.qlcplus.classes", 1, 0, "ContextManager", "Can't create a ContextManager!");
     qmlRegisterUncreatableType<ShowManager>("org.qlcplus.classes", 1, 0, "ShowManager", "Can't create a ShowManager!");

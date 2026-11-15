@@ -51,6 +51,7 @@ set(SRC_FILES
     palettemanager.cpp palettemanager.h
     playbackmanager.cpp playbackmanager.h
     programmermanager.cpp programmermanager.h
+    programmercommands.cpp
     kahostageimport.cpp kahostageimport.h
     previewcontext.cpp previewcontext.h
     rgbmatrixeditor.cpp rgbmatrixeditor.h

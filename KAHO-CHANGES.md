@@ -65,6 +65,21 @@ the fork changes. All original copyright notices are kept.
   shown only on held channels, toolbar with held channels count, "release
   universe" and 0-255 / % switch. `SimpleDesk::channelColor()` and
   `SimpleDesk::channelShortName()` added for it.
+- **Console workflow (pools, command line, executor bar, sheets)**:
+  - `qmlui/qml/Pools.qml` (F8, plain `PreviewContext` "POOLS" registered in
+    `app.cpp`): pools of groups, colour presets, position presets, effects and
+    sequences as grids of cells with STORE / DELETE modes, a live fixture
+    sheet (programmer values in red) and a sequence sheet per executor.
+  - `qmlui/qml/CommandLine.qml` + `qmlui/programmercommands.cpp`: command line
+    under every window (F9): `Group 1 Thru 3`, `Fixture 4 + 6`, `At 50`,
+    `Full`, `Color Rouge`, `Preset 4.2`, `Effect Cercle`, `Store Exec 2 "name"`,
+    `Store Preset 4.13`, `Update Exec 2`, `Go 2`, `GoBack 2`, `Off 2`,
+    `Off All`, `Page 2`, `Clear`, `ClearAll`, `Blackout`, `Label`, `Delete`.
+  - `qmlui/qml/ExecutorBar.qml`: the 8 playbacks of the current page and the
+    Grand Master under every window (hidden in the Playbacks window).
+  - Programmer presets go from 8 to 16 per kind, with default colours and
+    positions in a new project. `PlaybackManager` gained `runningIds`,
+    `toggleFunction()` and `cueList()`.
 - **KahoStage scene import** (`qmlui/kahostageimport.*`, Actions menu > File):
   reads the `KahoStage-scene.json` written by the KahoStage Minecraft plugin
   and places the fixtures (matched by name) and the trusses in the 2D / 3D

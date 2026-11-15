@@ -67,6 +67,8 @@ Rectangle
             item = pbEntry
         else if (ctx === "PROGRAMMER")
             item = prEntry
+        else if (ctx === "POOLS")
+            item = poEntry
 
         if (item)
         {
@@ -255,6 +257,7 @@ Rectangle
                         case "VC": return qsTr("Console virtuelle")
                         case "PLAYBACKS": return qsTr("Playbacks")
                         case "PROGRAMMER": return qsTr("Programmeur")
+                        case "POOLS": return qsTr("Pools")
                         case "SDESK": return qsTr("Pupitre simple")
                         case "SHOWMGR": return qsTr("Show")
                         case "IOMGR": return qsTr("Entrées / sorties")
@@ -674,6 +677,29 @@ Rectangle
         } // end of RowLayout
     } // end of mainToolbar
 
+    /* KAHO: command line and executor bar, under every window */
+    CommandLine
+    {
+        id: commandLine
+        visible: mainToolbar.visible && (qlcplus.accessMask & App.AC_FixtureEditing)
+        x: mainView.safeLeft
+        y: executorBar.y - height
+        width: windowKeysBar.width
+        height: UISettings.listItemHeight * 1.2
+        z: 50
+    }
+    ExecutorBar
+    {
+        id: executorBar
+        // the Playbacks window already shows them in full
+        visible: mainToolbar.visible && currentContext !== "PLAYBACKS"
+        x: mainView.safeLeft
+        y: windowKeysBar.y - (visible ? height : 0)
+        width: windowKeysBar.width
+        height: UISettings.listItemHeight * 2.1
+        z: 50
+    }
+
     /* Console window keys */
     Rectangle
     {
@@ -713,6 +739,23 @@ Rectangle
                 {
                     if (checked === true)
                         switchToContext(fnfEntry.ctxName, fnfEntry.ctxRes)
+                }
+            }
+            ConsoleWindowKey
+            {
+                id: poEntry
+                property string ctxName: "POOLS"
+                property string ctxRes: "qrc:/Pools.qml"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                entryText: qsTr("Pools")
+                keyHint: "F8"
+                ButtonGroup.group: menuBarGroup
+                visible: qlcplus.accessMask & App.AC_FixtureEditing
+                onCheckedChanged:
+                {
+                    if (checked === true)
+                        switchToContext(poEntry.ctxName, poEntry.ctxRes)
                 }
             }
             ConsoleWindowKey
@@ -856,6 +899,8 @@ Rectangle
         Shortcut { sequence: "F5"; enabled: smEntry.visible; onActivated: smEntry.checked = true }
         Shortcut { sequence: "F6"; enabled: ioEntry.visible; onActivated: ioEntry.checked = true }
         Shortcut { sequence: "F7"; enabled: vcEntry.visible; onActivated: vcEntry.checked = true }
+        Shortcut { sequence: "F8"; enabled: poEntry.visible; onActivated: poEntry.checked = true }
+        Shortcut { sequence: "F9"; enabled: commandLine.visible; onActivated: commandLine.focusInput() }
     }
 
     Loader
@@ -875,6 +920,7 @@ Rectangle
         y: mainView.safeTop + (mainToolbar.visible ? mainToolbar.height : 0)
         width: parent.width - mainView.safeLeft - mainView.safeRight
         height: parent.height - y - mainView.safeBottom - (windowKeysBar.visible ? windowKeysBar.height : 0)
+                - (commandLine.visible ? commandLine.height : 0) - (executorBar.visible ? executorBar.height : 0)
 
         Component.onCompleted:
         {

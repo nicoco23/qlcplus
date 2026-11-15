@@ -527,7 +527,8 @@ Rectangle
                         }
                         Repeater
                         {
-                            model: programmer.colorMemories
+                            // presets 9 to 16 (1 to 8 hold the colours above; all 16 are in the Pools window)
+                            model: programmer.colorMemories.slice(8, 16)
                             Rectangle
                             {
                                 width: (parent.width - pgRoot.unit * 1.1 - 3 * 8) / 8
@@ -554,9 +555,9 @@ Rectangle
                                     {
                                         pgRoot.forceActiveFocus()
                                         if (mouse.button === Qt.RightButton)
-                                            programmer.memoryClear("color", index)
+                                            programmer.memoryClear("color", index + 8)
                                         else
-                                            programmer.memoryPress("color", index)
+                                            programmer.memoryPress("color", index + 8)
                                     }
                                     ToolTip.visible: containsMouse
                                     ToolTip.delay: 500
@@ -724,7 +725,7 @@ Rectangle
                             }
                             Repeater
                             {
-                                model: programmer.positionMemories
+                                model: programmer.positionMemories.slice(8, 16)
                                 Rectangle
                                 {
                                     width: (parent.width - pgRoot.unit * 2.2 - 3 * 8) / 8
@@ -735,7 +736,7 @@ Rectangle
                                     Text
                                     {
                                         anchors.centerIn: parent
-                                        text: modelData.used ? (index + 1) : "+"
+                                        text: modelData.used ? (index + 9) : "+"
                                         color: modelData.used ? UISettings.fgMain : UISettings.bgLighter
                                         font.family: UISettings.titleFontName
                                         font.pixelSize: UISettings.textSizeDefault * 0.65
@@ -750,9 +751,9 @@ Rectangle
                                         {
                                             pgRoot.forceActiveFocus()
                                             if (mouse.button === Qt.RightButton)
-                                                programmer.memoryClear("position", index)
+                                                programmer.memoryClear("position", index + 8)
                                             else
-                                                programmer.memoryPress("position", index)
+                                                programmer.memoryPress("position", index + 8)
                                         }
                                         ToolTip.visible: containsMouse
                                         ToolTip.delay: 500

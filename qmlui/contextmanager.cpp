@@ -231,8 +231,8 @@ void ContextManager::switchToContext(QString name)
 {
     QString ctxName = name;
     QStringList qlc4names, qlc5names;
-    qlc4names << "FixtureManager" << "FunctionManager" << "ShowManager" << "VirtualConsole" << "SimpleDesk" << "InputOutputManager" << "Playbacks" << "Programmer";
-    qlc5names << "FIXANDFUNC" << "FIXANDFUNC" << "SHOWMGR" << "VC" << "SDESK" << "IOMGR" << "PLAYBACKS" << "PROGRAMMER";
+    qlc4names << "FixtureManager" << "FunctionManager" << "ShowManager" << "VirtualConsole" << "SimpleDesk" << "InputOutputManager" << "Playbacks" << "Programmer" << "Pools";
+    qlc5names << "FIXANDFUNC" << "FIXANDFUNC" << "SHOWMGR" << "VC" << "SDESK" << "IOMGR" << "PLAYBACKS" << "PROGRAMMER" << "POOLS";
 
     int ctxIndex = qlc5names.indexOf(name);
     if (ctxIndex < 0)
