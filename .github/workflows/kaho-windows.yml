@@ -209,13 +209,14 @@ jobs:
             cp -f "/mingw64/bin/$dll" "$dll"
           done
           # every symbol the program takes from winpthread must exist in the DLL shipped with it
-          objdump -p libwinpthread-1.dll | awk '/\[Ordinal\/Name Pointer\] Table/{t=1;next} t&&NF>=3{print $NF}' | sort -u > /tmp/exported.txt
+          objdump -p libwinpthread-1.dll | grep -o 'pthread_[A-Za-z0-9_]*' | sort -u > /tmp/exported.txt
+          [ -s /tmp/exported.txt ] || { echo "::error::could not read the exports of libwinpthread-1.dll"; exit 1; }
           missing=0
           for bin in qlcplus5.exe qlcplusengine.dll; do
-            objdump -p "$bin" | awk '/DLL Name: libwinpthread-1.dll/{t=1;next} /DLL Name:/{t=0} t&&NF>=3&&$1~/^[0-9a-f]+$/{print $NF}' | sort -u > /tmp/needed.txt
+            objdump -p "$bin" | sed -n '/DLL Name: libwinpthread-1.dll/,/DLL Name: [^l]/p' | grep -o 'pthread_[A-Za-z0-9_]*' | sort -u > /tmp/needed.txt
+            echo "$bin: $(wc -l < /tmp/needed.txt) pthread symbols needed"
             for sym in $(comm -23 /tmp/needed.txt /tmp/exported.txt); do echo "::error::$bin needs $sym, missing from libwinpthread-1.dll"; missing=1; done
           done
-          [ -s /tmp/exported.txt ] || { echo "::error::could not read the exports of libwinpthread-1.dll"; exit 1; }
           exit $missing
 
       - name: Build installation package
