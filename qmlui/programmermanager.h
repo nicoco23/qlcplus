@@ -28,12 +28,14 @@
 #include <QStringList>
 
 #include "previewcontext.h"
+#include "scenevalue.h"
 
 #define KXMLQLCProgrammer QStringLiteral("Programmer")
 
 class QXmlStreamReader;
 class QXmlStreamWriter;
 class PlaybackManager;
+class LinkClock;
 class ContextManager;
 class Function;
 class Doc;
@@ -66,6 +68,10 @@ class ProgrammerManager final : public PreviewContext
     Q_PROPERTY(qreal cueFade READ cueFade WRITE setCueFade NOTIFY cueFadeChanged)
     Q_PROPERTY(QVariantList colorMemories READ colorMemories NOTIFY memoriesChanged)
     Q_PROPERTY(QVariantList positionMemories READ positionMemories NOTIFY memoriesChanged)
+    Q_PROPERTY(QString tempoSource READ tempoSource WRITE setTempoSource NOTIFY tempoSourceChanged)
+    Q_PROPERTY(qreal tempoMultiplier READ tempoMultiplier WRITE setTempoMultiplier NOTIFY effectParamsChanged)
+    Q_PROPERTY(bool linkAvailable READ linkAvailable CONSTANT)
+    Q_PROPERTY(int linkPeers READ linkPeers NOTIFY tempoSourceChanged)
     Q_PROPERTY(QVariantList fixtureSheet READ fixtureSheet NOTIFY fixtureSheetChanged)
     Q_PROPERTY(bool sheetActive READ sheetActive WRITE setSheetActive NOTIFY sheetActiveChanged)
     Q_PROPERTY(QStringList commandLog READ commandLog NOTIFY commandLogChanged)
@@ -155,6 +161,20 @@ public:
     Q_INVOKABLE bool memoryStore(const QString &kind, int index);
     Q_INVOKABLE void memoryRename(const QString &kind, int index, const QString &name);
 
+    /* Show tempo: every effect made here (in the programmer or in a recorded cue) follows it.
+     * Source: "manual" (slider, TAP), "console" (the QLC+ BPM: internal, MIDI clock, audio)
+     * or "link" (Ableton Link session: rekordbox, Live...) */
+    QString tempoSource() const { return m_tempoSource; }
+    void setTempoSource(const QString &source);
+    qreal tempoMultiplier() const { return m_tempoMult; }
+    void setTempoMultiplier(qreal mult);
+    bool linkAvailable() const;
+    int linkPeers() const;
+    Q_INVOKABLE void tap();
+
+    /** Number of recorded cues that follow a preset */
+    int presetCueCount(const QString &kind, int index) const;
+
     /* Fixture sheet: one row per fixture with its live output, refreshed while a view shows it */
     QVariantList fixtureSheet() const { return m_sheet; }
     bool sheetActive() const { return m_sheetTimer.isActive(); }
@@ -183,6 +203,7 @@ signals:
     void cueFadeChanged();
     void memoriesChanged();
     void fixtureSheetChanged();
+    void tempoSourceChanged();
     void sheetActiveChanged();
     void commandLogChanged();
 
@@ -215,6 +236,11 @@ private:
     void appendToSlot(bool isFader, int index, quint32 slotFid);
     void updateSlot(bool isFader, int index, quint32 slotFid);
     void defaultMemories();
+    void applyTempo(qreal sourceBpm);
+    QList<SceneValue> positionValues(qreal pan, qreal tilt, qreal fan, bool crossed, const QList<quint32> &ids) const;
+    void dropActiveRefs(const QString &kind, const QList<quint32> &fixtures);
+    void linkActiveRefs(quint32 sceneId);
+    int applyPresetToCues(const QString &kind, int index);
     QString runCommand(const QStringList &tokens, bool &ok);
     void selectIds(const QList<quint32> &ids, bool additive, bool remove);
 
@@ -245,6 +271,25 @@ private:
 
     QVector<Memory> m_colorMemories;
     QVector<Memory> m_positionMemories;
+
+    /* tempo */
+    QString m_tempoSource;
+    qreal m_sourceBpm;
+    qreal m_tempoMult;
+    LinkClock *m_link;
+    QList<qint64> m_taps;
+    QMap<quint32, qreal> m_tempoLinks;      // effect function -> beats per step: follows the show tempo
+
+    /* presets recalled in the programmer, and the cues recorded from them */
+    struct PresetRef
+    {
+        quint32 sceneId;
+        QString kind;                       // "color" or "position"
+        int index;
+        QList<quint32> fixtures;            // in selection order (fan)
+    };
+    QList<PresetRef> m_activeRefs;          // sceneId unused
+    QList<PresetRef> m_presetLinks;
 
     QTimer m_sheetTimer;
     QVariantList m_sheet;

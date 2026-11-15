@@ -476,6 +476,26 @@ QString ProgrammerManager::runCommand(const QStringList &tokens, bool &ok)
             done.append(tr("fondu %1 s").arg(cueFade()));
             continue;
         }
+        if (t == "tempo" && pos + 1 < tokens.count() && isNumber(tokens.at(pos + 1)) == false)
+        {
+            QString src = tokens.at(pos + 1);
+            if (src == "manuel") src = "manual";
+            if (src != "manual" && src != "console" && src != "link")
+                return fail(tr("Tempo : un nombre, ou Manual, Console, Link"));
+            if (src == "link" && linkAvailable() == false)
+                return fail(tr("Cette version est compilée sans Ableton Link"));
+            setTempoSource(src);
+            pos += 2;
+            done.append(tr("tempo : %1").arg(src));
+            continue;
+        }
+        if (t == "tap")
+        {
+            tap();
+            pos++;
+            done.append(tr("%1 BPM").arg(effectBpm(), 0, 'f', 1));
+            continue;
+        }
         if ((t == "bpm" || t == "tempo") && pos + 1 < tokens.count() && isNumber(tokens.at(pos + 1)))
         {
             setEffectBpm(tokens.at(pos + 1).toDouble());
@@ -512,7 +532,9 @@ QString ProgrammerManager::runCommand(const QStringList &tokens, bool &ok)
                     return fail(kind == "color" ? tr("Choisis d'abord une couleur") : tr("Preset invalide"));
                 if (name(p).isEmpty() == false)
                     memoryRename(kind, index, name(p));
-                done.append(tr("preset %1 %2 enregistré").arg(kind == "color" ? tr("couleur") : tr("position")).arg(index + 1));
+                int cues = presetCueCount(kind, index);
+                done.append(tr("preset %1 %2 enregistré").arg(kind == "color" ? tr("couleur") : tr("position")).arg(index + 1)
+                            + (cues > 0 ? tr(" · %1 cue(s) mis à jour").arg(cues) : QString()));
                 return done.join(" · ");
             }
             if (hasContent() == false)

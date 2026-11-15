@@ -80,6 +80,18 @@ the fork changes. All original copyright notices are kept.
   - Programmer presets go from 8 to 16 per kind, with default colours and
     positions in a new project. `PlaybackManager` gained `runningIds`,
     `toggleFunction()` and `cueList()`.
+- **Show tempo** (`qmlui/programmermanager.*`, `qmlui/linkclock.*`): every
+  effect created by the programmer, including those recorded in cues, follows
+  one show tempo (saved as `<Tempo>` entries of the `<Programmer>` element).
+  Its source is manual (slider, TAP), the QLC+ BPM (internal, MIDI clock,
+  audio) or an **Ableton Link** session (rekordbox, Live...). Link is fetched
+  at configure time by `qmlui/CMakeLists.txt` (option `KAHO_ABLETON_LINK`,
+  ON by default). Ableton Link is GPL v2+: a binary built with the option is
+  distributed under the GPL (v3 is compatible with Apache 2.0); build with
+  `-DKAHO_ABLETON_LINK=OFF` to keep an Apache-only binary.
+- **Presets followed by cues**: a cue recorded from a colour or position
+  preset keeps a link to it (`<Link>` entries); storing the preset again
+  updates every linked cue, live if it is running.
 - **KahoStage scene import** (`qmlui/kahostageimport.*`, Actions menu > File):
   reads the `KahoStage-scene.json` written by the KahoStage Minecraft plugin
   and places the fixtures (matched by name) and the trusses in the 2D / 3D

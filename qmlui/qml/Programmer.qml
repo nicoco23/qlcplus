@@ -962,7 +962,7 @@ Rectangle
         {
             id: effPanel
             Layout.fillWidth: true
-            Layout.preferredHeight: pgRoot.unit * 4.3
+            Layout.preferredHeight: pgRoot.unit * 5.3
             title: qsTr("EFFETS")
             hint: qsTr("un effet par famille · re-cliquer l'arrête · il suit le tempo réglé à droite")
             enabled: pgRoot.hasSelection
@@ -1033,6 +1033,35 @@ Rectangle
                         valueText: Math.round(programmer.effectBpm) + " BPM"
                         onMoved: (v) => programmer.effectBpm = Math.round(40 + v * 200)
                     }
+                    // where the tempo comes from
+                    RowLayout
+                    {
+                        Layout.fillWidth: true
+                        spacing: pgRoot.gap
+                        Repeater
+                        {
+                            model: [ { k: "manual", l: qsTr("MAN.") }, { k: "console", l: qsTr("QLC+") }, { k: "link", l: qsTr("LINK") } ]
+                            ConsoleKey
+                            {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: pgRoot.unit * 0.75
+                                text: modelData.k === "link" && programmer.tempoSource === "link" ? qsTr("LINK · %1").arg(programmer.linkPeers) : modelData.l
+                                fontSize: UISettings.textSizeDefault * 0.55
+                                lit: programmer.tempoSource === modelData.k
+                                keyColor: modelData.k === "link" && programmer.linkPeers === 0 ? UISettings.fgMedium : UISettings.consoleGo
+                                enabled: modelData.k !== "link" || programmer.linkAvailable
+                                onClicked: programmer.tempoSource = modelData.k
+                            }
+                        }
+                        ConsoleKey
+                        {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: pgRoot.unit * 0.75
+                            text: qsTr("TAP")
+                            fontSize: UISettings.textSizeDefault * 0.6
+                            onClicked: programmer.tap()
+                        }
+                    }
                     HSlider
                     {
                         Layout.fillWidth: true
@@ -1050,14 +1079,16 @@ Rectangle
                             Layout.fillWidth: true
                             Layout.preferredHeight: pgRoot.unit * 0.8
                             text: qsTr("½")
-                            onClicked: programmer.effectBpm = programmer.effectBpm / 2
+                            onClicked: programmer.tempoSource === "manual" ? programmer.effectBpm = programmer.effectBpm / 2
+                                                                           : programmer.tempoMultiplier = programmer.tempoMultiplier / 2
                         }
                         ConsoleKey
                         {
                             Layout.fillWidth: true
                             Layout.preferredHeight: pgRoot.unit * 0.8
                             text: qsTr("×2")
-                            onClicked: programmer.effectBpm = programmer.effectBpm * 2
+                            onClicked: programmer.tempoSource === "manual" ? programmer.effectBpm = programmer.effectBpm * 2
+                                                                           : programmer.tempoMultiplier = programmer.tempoMultiplier * 2
                         }
                         ConsoleKey
                         {

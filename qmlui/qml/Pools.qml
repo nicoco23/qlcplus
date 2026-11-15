@@ -289,6 +289,24 @@ Rectangle
                     keyColor: UISettings.fgLight
                     onClicked: programmer.executeCommand("Locate")
                 }
+                // show tempo: click to change the source, TAP to beat it in
+                ModeKey
+                {
+                    Layout.preferredWidth: plRoot.unit * 5.2
+                    readonly property var order: programmer.linkAvailable ? [ "manual", "console", "link" ] : [ "manual", "console" ]
+                    text: Math.round(programmer.effectBpm) + " BPM · "
+                          + (programmer.tempoSource === "link" ? qsTr("LINK (%1)").arg(programmer.linkPeers)
+                             : (programmer.tempoSource === "console" ? qsTr("CONSOLE") : qsTr("MANUEL")))
+                    keyColor: programmer.tempoSource === "manual" ? UISettings.fgLight
+                              : (programmer.tempoSource === "link" && programmer.linkPeers === 0 ? UISettings.consoleRelease : UISettings.consoleGo)
+                    onClicked: programmer.tempoSource = order[(order.indexOf(programmer.tempoSource) + 1) % order.length]
+                }
+                ModeKey
+                {
+                    Layout.preferredWidth: plRoot.unit * 1.8
+                    text: qsTr("TAP")
+                    onClicked: programmer.tap()
+                }
                 Text
                 {
                     Layout.fillWidth: true
@@ -355,6 +373,7 @@ Rectangle
                                 label: modelData.used ? modelData.name : ""
                                 tint: plRoot.cColor
                                 used: modelData.used
+                                sub: modelData.cues > 0 ? qsTr("%1 cue").arg(modelData.cues) : ""
                                 swatch: modelData.used ? modelData.color : "transparent"
                                 armed: plRoot.mode === "store" || (plRoot.mode === "delete" && modelData.used)
                                 onClicked: plRoot.presetClick("color", index, modelData.used)
@@ -377,6 +396,7 @@ Rectangle
                                 label: modelData.used ? modelData.name : ""
                                 tint: plRoot.cPosition
                                 used: modelData.used
+                                sub: modelData.cues > 0 ? qsTr("%1 cue").arg(modelData.cues) : ""
                                 armed: plRoot.mode === "store" || (plRoot.mode === "delete" && modelData.used)
                                 onClicked: plRoot.presetClick("position", index, modelData.used)
                             }

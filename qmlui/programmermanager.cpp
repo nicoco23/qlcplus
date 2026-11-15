@@ -24,7 +24,11 @@
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 
+#include <QDateTime>
+
 #include "programmermanager.h"
+#include "mastertimer.h"
+#include "linkclock.h"
 #include "playbackmanager.h"
 #include "contextmanager.h"
 #include "functionparent.h"
@@ -116,6 +120,10 @@ ProgrammerManager::ProgrammerManager(QQuickView *view, Doc *doc, ContextManager 
     , m_pendingCue(Function::invalidId())
     , m_colorMemories(MemoryCount)
     , m_positionMemories(MemoryCount)
+    , m_tempoSource("manual")
+    , m_sourceBpm(120)
+    , m_tempoMult(1)
+    , m_link(new LinkClock(this))
 {
     setContextResource("qrc:/Programmer.qml");
     setContextTitle(tr("Programmer"));
@@ -127,6 +135,22 @@ ProgrammerManager::ProgrammerManager(QQuickView *view, Doc *doc, ContextManager 
     m_sheetTimer.setInterval(200);
     connect(&m_sheetTimer, &QTimer::timeout, this, &ProgrammerManager::slotRefreshSheet);
     defaultMemories();
+    connect(m_doc->masterTimer(), &MasterTimer::bpmNumberChanged, this, [this](int bpm)
+    {
+        if (m_tempoSource == "console" && bpm > 0)
+            applyTempo(bpm);
+    });
+    connect(m_link, &LinkClock::tempoChanged, this, [this](qreal bpm)
+    {
+        if (m_tempoSource == "link")
+            applyTempo(bpm);
+    });
+    connect(m_link, &LinkClock::peersChanged, this, [this](int peers)
+    {
+        if (peers > 0 && m_tempoSource == "link")
+            applyTempo(m_link->tempo());
+        emit tempoSourceChanged();
+    });
     connect(m_contextManager, &ContextManager::dumpValuesCountChanged, this, &ProgrammerManager::programmerChanged);
     connect(m_doc, &Doc::fixtureGroupAdded, this, &ProgrammerManager::groupsChanged);
     connect(m_doc, &Doc::fixtureGroupRemoved, this, &ProgrammerManager::groupsChanged);
@@ -310,6 +334,7 @@ void ProgrammerManager::setIntensity(qreal level)
 
 void ProgrammerManager::setColor(QColor color)
 {
+    dropActiveRefs("color", selectedFixtures());
     m_lastColor = color;
     m_contextManager->setColorValue(color, QColor(0, 0, 0));
 }
@@ -378,6 +403,7 @@ void ProgrammerManager::setZoom(qreal amount)
 
 void ProgrammerManager::setPosition(qreal panDegrees, qreal tiltDegrees)
 {
+    dropActiveRefs("position", selectedFixtures());
     m_pan = panDegrees;
     m_tilt = tiltDegrees;
     applyPosition();
@@ -386,6 +412,7 @@ void ProgrammerManager::setPosition(qreal panDegrees, qreal tiltDegrees)
 
 void ProgrammerManager::setFan(qreal degrees)
 {
+    dropActiveRefs("position", selectedFixtures());
     m_fan = degrees;
     applyPosition();
     emit positionChanged();
@@ -393,6 +420,7 @@ void ProgrammerManager::setFan(qreal degrees)
 
 void ProgrammerManager::positionPreset(const QString &name)
 {
+    dropActiveRefs("position", selectedFixtures());
     m_crossed = false;
     if (name == "centre")         { m_pan = 0; m_tilt = 0;   m_fan = 0; }
     else if (name == "face")      { m_pan = 0; m_tilt = 45;  m_fan = 0; }
@@ -406,9 +434,9 @@ void ProgrammerManager::positionPreset(const QString &name)
     emit positionChanged();
 }
 
-void ProgrammerManager::applyPosition()
+QList<SceneValue> ProgrammerManager::positionValues(qreal pan, qreal tilt, qreal fan, bool crossed,
+                                                    const QList<quint32> &ids) const
 {
-    QList<quint32> ids = selectedFixtures();
     int count = ids.count();
     QList<SceneValue> values;
 
@@ -424,18 +452,23 @@ void ProgrammerManager::applyPosition()
 
         // spread the pan across the selection, or cross every other fixture
         qreal offset = 0;
-        if (m_crossed)
-            offset = (i % 2 == 0 ? -0.5 : 0.5) * m_fan;
+        if (crossed)
+            offset = (i % 2 == 0 ? -0.5 : 0.5) * fan;
         else if (count > 1)
-            offset = (qreal(i) / (count - 1) - 0.5) * m_fan;
+            offset = (qreal(i) / (count - 1) - 0.5) * fan;
 
-        qreal panDeg = qBound(0.0, panMax / 2 + m_pan + offset, panMax);
-        qreal tiltDeg = qBound(0.0, tiltMax / 2 + m_tilt, tiltMax);
+        qreal panDeg = qBound(0.0, panMax / 2 + pan + offset, panMax);
+        qreal tiltDeg = qBound(0.0, tiltMax / 2 + tilt, tiltMax);
 
         values.append(fxi->positionToValues(QLCChannel::Pan, panDeg));
         values.append(fxi->positionToValues(QLCChannel::Tilt, tiltDeg));
     }
-    m_contextManager->setChannelValues(values);
+    return values;
+}
+
+void ProgrammerManager::applyPosition()
+{
+    m_contextManager->setChannelValues(positionValues(m_pan, m_tilt, m_fan, m_crossed, selectedFixtures()));
 }
 
 /*********************************************************************
@@ -506,6 +539,7 @@ Function *ProgrammerManager::createEffect(const QString &key, const QList<quint3
             return nullptr;
         }
         m_effects.insert(key, { efx->id(), FixtureGroup::invalidId() });
+        m_tempoLinks.insert(efx->id(), def->beatsPerStep);
         return efx;
     }
 
@@ -561,6 +595,7 @@ Function *ProgrammerManager::createEffect(const QString &key, const QList<quint3
         return nullptr;
     }
     m_effects.insert(key, { mtx->id(), grp->id() });
+    m_tempoLinks.insert(mtx->id(), def->beatsPerStep);
     return mtx;
 }
 
@@ -636,7 +671,10 @@ void ProgrammerManager::removeEffect(const QString &key, bool deleteFunction)
                 f->stop(FunctionParent::master());
         }
         if (deleteFunction)
+        {
+            m_tempoLinks.remove(e.functionId);
             m_doc->deleteFunction(e.functionId);
+        }
     }
     if (deleteFunction && e.groupId != FixtureGroup::invalidId())
         m_doc->deleteFixtureGroup(e.groupId);
@@ -652,6 +690,20 @@ void ProgrammerManager::clearEffects()
 
 void ProgrammerManager::updateEffectParams()
 {
+    // every effect recorded in a cue keeps following the show tempo
+    qreal beat = 60000.0 / qBound(20.0, m_bpm, 300.0);
+    for (auto it = m_tempoLinks.begin(); it != m_tempoLinks.end(); )
+    {
+        Function *f = m_doc->function(it.key());
+        if (f == nullptr)
+        {
+            it = m_tempoLinks.erase(it);
+            continue;
+        }
+        f->setDuration(uint(qMax(20.0, beat * it.value())));
+        ++it;
+    }
+
     for (auto it = m_effects.cbegin(); it != m_effects.cend(); ++it)
     {
         Function *f = m_doc->function(it.value().functionId);
@@ -674,12 +726,173 @@ void ProgrammerManager::updateEffectParams()
 
 void ProgrammerManager::setEffectBpm(qreal bpm)
 {
-    bpm = qBound(20.0, bpm, 300.0);
-    if (qFuzzyCompare(bpm, m_bpm))
+    // set by hand: stop following the console or Link
+    if (m_tempoSource != "manual")
+        setTempoSource("manual");
+    m_tempoMult = 1;
+    applyTempo(bpm);
+}
+
+void ProgrammerManager::applyTempo(qreal sourceBpm)
+{
+    m_sourceBpm = qBound(20.0, sourceBpm, 300.0);
+    qreal bpm = qBound(20.0, m_sourceBpm * m_tempoMult, 300.0);
+    if (qAbs(bpm - m_bpm) < 0.005)
         return;
     m_bpm = bpm;
     updateEffectParams();
     emit effectParamsChanged();
+}
+
+void ProgrammerManager::setTempoMultiplier(qreal mult)
+{
+    m_tempoMult = qBound(0.125, mult, 8.0);
+    applyTempo(m_sourceBpm);
+    emit effectParamsChanged();
+}
+
+void ProgrammerManager::setTempoSource(const QString &source)
+{
+    QString src = (source == "console" || (source == "link" && linkAvailable())) ? source : QStringLiteral("manual");
+    if (src == m_tempoSource)
+        return;
+    m_tempoSource = src;
+    m_link->setEnabled(src == "link");
+    if (src == "console" && m_doc->masterTimer()->bpmNumber() > 0)
+        applyTempo(m_doc->masterTimer()->bpmNumber());
+    else if (src == "link" && m_link->peers() > 0)
+        applyTempo(m_link->tempo());
+    else if (src == "manual")
+    {
+        // keep the tempo we had, as a plain manual value
+        m_sourceBpm = m_bpm;
+        m_tempoMult = 1;
+    }
+    m_doc->setModified();
+    emit tempoSourceChanged();
+    emit effectParamsChanged();
+}
+
+bool ProgrammerManager::linkAvailable() const
+{
+    return LinkClock::available();
+}
+
+int ProgrammerManager::linkPeers() const
+{
+    return m_link->peers();
+}
+
+void ProgrammerManager::tap()
+{
+    qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (m_taps.isEmpty() == false && now - m_taps.last() > 2500)
+        m_taps.clear();
+    m_taps.append(now);
+    while (m_taps.count() > 8)
+        m_taps.removeFirst();
+    if (m_taps.count() < 2)
+        return;
+    qreal interval = qreal(m_taps.last() - m_taps.first()) / (m_taps.count() - 1);
+    if (interval > 0)
+        setEffectBpm(qRound(60000.0 / interval * 10) / 10.0);
+}
+
+/*********************************************************************
+ * Presets followed by the recorded cues
+ *********************************************************************/
+
+void ProgrammerManager::dropActiveRefs(const QString &kind, const QList<quint32> &fixtures)
+{
+    for (int i = m_activeRefs.count() - 1; i >= 0; i--)
+    {
+        PresetRef &ref = m_activeRefs[i];
+        if (ref.kind != kind)
+            continue;
+        for (quint32 id : fixtures)
+            ref.fixtures.removeAll(id);
+        if (ref.fixtures.isEmpty())
+            m_activeRefs.removeAt(i);
+    }
+}
+
+void ProgrammerManager::linkActiveRefs(quint32 sceneId)
+{
+    for (const PresetRef &active : m_activeRefs)
+    {
+        // what the scene held for these fixtures is replaced
+        for (int i = m_presetLinks.count() - 1; i >= 0; i--)
+        {
+            PresetRef &link = m_presetLinks[i];
+            if (link.sceneId != sceneId || link.kind != active.kind)
+                continue;
+            for (quint32 id : active.fixtures)
+                link.fixtures.removeAll(id);
+            if (link.fixtures.isEmpty())
+                m_presetLinks.removeAt(i);
+        }
+        PresetRef link = active;
+        link.sceneId = sceneId;
+        m_presetLinks.append(link);
+    }
+}
+
+int ProgrammerManager::presetCueCount(const QString &kind, int index) const
+{
+    QSet<quint32> scenes;
+    for (const PresetRef &link : m_presetLinks)
+        if (link.kind == kind && link.index == index && m_doc->function(link.sceneId) != nullptr)
+            scenes.insert(link.sceneId);
+    return scenes.count();
+}
+
+int ProgrammerManager::applyPresetToCues(const QString &kind, int index)
+{
+    const QVector<Memory> &list = kind == "color" ? m_colorMemories : m_positionMemories;
+    if (index < 0 || index >= list.count() || list[index].used == false)
+        return 0;
+    const Memory &m = list[index];
+
+    QSet<quint32> scenes;
+    for (int i = m_presetLinks.count() - 1; i >= 0; i--)
+    {
+        const PresetRef &link = m_presetLinks.at(i);
+        if (link.kind != kind || link.index != index)
+            continue;
+        Scene *scene = qobject_cast<Scene *>(m_doc->function(link.sceneId));
+        if (scene == nullptr)
+        {
+            m_presetLinks.removeAt(i);      // the cue was deleted
+            continue;
+        }
+
+        QList<SceneValue> values;
+        if (kind == "color")
+        {
+            for (quint32 id : link.fixtures)
+            {
+                Fixture *fxi = m_doc->fixture(id);
+                if (fxi == nullptr)
+                    continue;
+                QVector<quint32> rgb = fxi->rgbChannels();
+                if (rgb.count() == 3)
+                {
+                    values.append(SceneValue(id, rgb[0], uchar(m.color.red())));
+                    values.append(SceneValue(id, rgb[1], uchar(m.color.green())));
+                    values.append(SceneValue(id, rgb[2], uchar(m.color.blue())));
+                }
+            }
+        }
+        else
+            values = positionValues(m.pan, m.tilt, m.fan, m.crossed, link.fixtures);
+
+        for (const SceneValue &sv : values)
+            scene->setValue(sv, false, false);      // a running cue follows live (no HTP check: lower values too)
+        scenes.insert(link.sceneId);
+    }
+    if (scenes.isEmpty() == false)
+        m_doc->setModified();
+    return scenes.count();
 }
 
 void ProgrammerManager::setEffectSize(qreal size)
@@ -748,6 +961,7 @@ quint32 ProgrammerManager::buildCue(const QString &cueName)
             delete scene;
             return Function::invalidId();
         }
+        linkActiveRefs(scene->id());
         parts.append(scene->id());
     }
 
@@ -794,12 +1008,14 @@ void ProgrammerManager::resetAfterRecord()
     for (const QString &key : keys)
         removeEffect(key, false);
     m_contextManager->resetDumpValues();
+    m_activeRefs.clear();
     m_cueCounter++;
     m_pan = m_tilt = m_fan = 0;
     m_crossed = false;
     emit positionChanged();
     emit effectsChanged();
     emit programmerChanged();
+    emit memoriesChanged();     // cue counts of the presets
 }
 
 quint32 ProgrammerManager::record(const QString &name, bool toFreeSlot)
@@ -941,6 +1157,7 @@ void ProgrammerManager::updateSlot(bool isFader, int index, quint32 slotFid)
         }
         for (const SceneValue &sv : values)
             scene->setValue(sv);
+        linkActiveRefs(scene->id());
     }
 
     if (m_effects.isEmpty() == false)
@@ -1009,6 +1226,7 @@ QVariantList ProgrammerManager::memoryList(const QVector<Memory> &list, bool col
         QVariantMap map;
         map.insert("used", m.used);
         map.insert("name", m.name);
+        map.insert("cues", m.used ? presetCueCount(colour ? "color" : "position", int(out.count())) : 0);
         if (colour)
             map.insert("color", m.used ? m.color : QColor(Qt::transparent));
         out.append(map);
@@ -1036,6 +1254,10 @@ void ProgrammerManager::memoryPress(const QString &kind, int index)
     if (m.used)
     {
         // recall
+        QList<quint32> ids = selectedFixtures();
+        dropActiveRefs(kind, ids);
+        if (ids.isEmpty() == false)
+            m_activeRefs.append({ Function::invalidId(), kind, index, ids });
         if (kind == "color")
         {
             m_lastColor = m.color;
@@ -1081,6 +1303,9 @@ void ProgrammerManager::memoryClear(const QString &kind, int index)
     if (index < 0 || index >= list.count() || list[index].used == false)
         return;
     list[index] = Memory();
+    for (int i = m_presetLinks.count() - 1; i >= 0; i--)
+        if (m_presetLinks.at(i).kind == kind && m_presetLinks.at(i).index == index)
+            m_presetLinks.removeAt(i);
     m_doc->setModified();
     emit memoriesChanged();
 }
@@ -1090,6 +1315,9 @@ void ProgrammerManager::resetContents()
     m_colorMemories = QVector<Memory>(MemoryCount);
     m_positionMemories = QVector<Memory>(MemoryCount);
     m_pendingCue = Function::invalidId();
+    m_tempoLinks.clear();
+    m_presetLinks.clear();
+    m_activeRefs.clear();
     defaultMemories();
     emit memoriesChanged();
 }
@@ -1148,6 +1376,7 @@ bool ProgrammerManager::memoryStore(const QString &kind, int index)
     memoryPress(kind, index);       // empty slot: stores
     if (keep.isEmpty() == false && kind != "color")
         list[index].name = keep;
+    applyPresetToCues(kind, index);
     emit memoriesChanged();
     return true;
 }
@@ -1169,8 +1398,35 @@ bool ProgrammerManager::loadXML(QXmlStreamReader &root)
 
     m_colorMemories = QVector<Memory>(MemoryCount);
     m_positionMemories = QVector<Memory>(MemoryCount);
+    {
+        QXmlStreamAttributes pa = root.attributes();
+        if (pa.hasAttribute("Bpm"))
+        {
+            m_tempoMult = 1;
+            applyTempo(pa.value("Bpm").toDouble());
+        }
+        setTempoSource(pa.value("TempoSource").toString());
+    }
     while (root.readNextStartElement())
     {
+        if (root.name() == QLatin1String("Tempo"))
+        {
+            QXmlStreamAttributes a = root.attributes();
+            m_tempoLinks.insert(a.value("Function").toUInt(), qMax(0.01, a.value("Beats").toDouble()));
+        }
+        else if (root.name() == QLatin1String("Link"))
+        {
+            QXmlStreamAttributes a = root.attributes();
+            PresetRef link;
+            link.sceneId = a.value("Scene").toUInt();
+            link.kind = a.value("Kind") == QLatin1String("Color") ? "color" : "position";
+            link.index = a.value("Index").toInt();
+            const QStringList ids = a.value("Fixtures").toString().split(',', Qt::SkipEmptyParts);
+            for (const QString &id : ids)
+                link.fixtures.append(id.toUInt());
+            if (link.fixtures.isEmpty() == false)
+                m_presetLinks.append(link);
+        }
         if (root.name() == QLatin1String("Memory"))
         {
             QXmlStreamAttributes a = root.attributes();
@@ -1202,6 +1458,31 @@ bool ProgrammerManager::loadXML(QXmlStreamReader &root)
 bool ProgrammerManager::saveXML(QXmlStreamWriter *doc) const
 {
     doc->writeStartElement(KXMLQLCProgrammer);
+    doc->writeAttribute("TempoSource", m_tempoSource);
+    doc->writeAttribute("Bpm", QString::number(m_sourceBpm));
+    for (auto it = m_tempoLinks.cbegin(); it != m_tempoLinks.cend(); ++it)
+    {
+        if (m_doc->function(it.key()) == nullptr)
+            continue;
+        doc->writeStartElement("Tempo");
+        doc->writeAttribute("Function", QString::number(it.key()));
+        doc->writeAttribute("Beats", QString::number(it.value()));
+        doc->writeEndElement();
+    }
+    for (const PresetRef &link : m_presetLinks)
+    {
+        if (m_doc->function(link.sceneId) == nullptr)
+            continue;
+        QStringList ids;
+        for (quint32 id : link.fixtures)
+            ids.append(QString::number(id));
+        doc->writeStartElement("Link");
+        doc->writeAttribute("Scene", QString::number(link.sceneId));
+        doc->writeAttribute("Kind", link.kind == "color" ? "Color" : "Position");
+        doc->writeAttribute("Index", QString::number(link.index));
+        doc->writeAttribute("Fixtures", ids.join(','));
+        doc->writeEndElement();
+    }
     for (int pass = 0; pass < 2; pass++)
     {
         const QVector<Memory> &list = pass == 0 ? m_colorMemories : m_positionMemories;
@@ -1234,6 +1515,7 @@ void ProgrammerManager::clearProgrammer()
 {
     clearEffects();
     m_contextManager->resetDumpValues();
+    m_activeRefs.clear();
     m_pan = m_tilt = m_fan = 0;
     m_crossed = false;
     emit positionChanged();

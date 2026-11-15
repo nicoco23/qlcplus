@@ -52,6 +52,7 @@ set(SRC_FILES
     playbackmanager.cpp playbackmanager.h
     programmermanager.cpp programmermanager.h
     programmercommands.cpp
+    linkclock.cpp linkclock.h
     kahostageimport.cpp kahostageimport.h
     previewcontext.cpp previewcontext.h
     rgbmatrixeditor.cpp rgbmatrixeditor.h
@@ -169,6 +170,23 @@ target_include_directories(${module_name} PRIVATE
     stagewizard
 )
 target_include_directories(${module_name} PUBLIC ${FFTW3_INCLUDE_DIRS})
+
+# KAHO: tempo sync with Ableton Link. The library is GPL v2+: a binary built with it
+# is distributed under the GPL (v3, compatible with Apache 2.0). -DKAHO_ABLETON_LINK=OFF builds without it.
+option(KAHO_ABLETON_LINK "Tempo sync through Ableton Link (GPL v2+ library)" ON)
+if(KAHO_ABLETON_LINK)
+    include(FetchContent)
+    FetchContent_Declare(abletonlink
+        GIT_REPOSITORY https://github.com/Ableton/link.git
+        GIT_TAG Link-4.1.1
+        GIT_SHALLOW ON
+        GIT_SUBMODULES_RECURSE ON
+        SOURCE_SUBDIR kaho-headers-only)     # no such folder: fetch the sources, do not build its examples
+    FetchContent_MakeAvailable(abletonlink)
+    include(${abletonlink_SOURCE_DIR}/AbletonLinkConfig.cmake)
+    target_link_libraries(${module_name} PRIVATE Ableton::Link)
+    target_compile_definitions(${module_name} PRIVATE KAHO_ABLETON_LINK)
+endif()
 
 target_compile_definitions(${module_name} PRIVATE
     NO_SSL
