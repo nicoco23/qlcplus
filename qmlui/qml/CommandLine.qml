@@ -158,13 +158,13 @@ Rectangle
             {
                 model: [ { t: "Group", w: 1.5 }, { t: "Fixture", w: 1.6 }, { t: "Thru", w: 1.3 }, { t: "+", w: 0.9 }, { t: "At", w: 1 },
                          { t: "Full", w: 1.2 }, { t: "Store", w: 1.4 }, { t: "Update", w: 1.6 }, { t: "Go", w: 1 }, { t: "Off", w: 1.1 },
-                         { t: "Clear", w: 1.4, run: true }, { t: "↵", w: 1, enter: true } ]
+                         { t: "Oops", w: 1.3, always: true }, { t: "Clear", w: 1.4, run: true }, { t: "↵", w: 1, enter: true } ]
                 Rectangle
                 {
                     width: skText.implicitWidth + UISettings.listItemHeight * 0.7
                     height: parent.height
                     radius: 5
-                    readonly property bool danger: modelData.t === "Clear"
+                    readonly property bool danger: modelData.t === "Clear" || modelData.t === "Oops"
                     readonly property bool main: modelData.t === "Store" || modelData.enter === true
                     color: skArea.pressed ? UISettings.bgLight : (skArea.containsMouse ? UISettings.bgControl : UISettings.bgMedium)
                     border.color: main ? UISettings.consoleAccent : UISettings.borderColorDark
@@ -173,6 +173,7 @@ Rectangle
                         id: skText
                         anchors.centerIn: parent
                         text: modelData.t.toUpperCase()
+                        opacity: modelData.t === "Oops" && programmer.undoText === "" ? 0.35 : 1
                         color: parent.danger ? UISettings.consoleRelease : (parent.main ? UISettings.consoleAccent : UISettings.fgMain)
                         font.family: UISettings.titleFontName
                         font.pixelSize: UISettings.textSizeDefault * 0.62
@@ -187,6 +188,8 @@ Rectangle
                         {
                             if (modelData.enter === true)
                                 cmdRoot.run(input.text)
+                            else if (modelData.always === true)
+                                programmer.executeCommand(modelData.t)
                             else if (modelData.run === true && input.text.trim() === "")
                                 cmdRoot.run(modelData.t)
                             else

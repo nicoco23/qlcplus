@@ -1,11 +1,15 @@
 name: KAHO Windows build
 
 # Installeur Windows de la version KAHO (interface QLC+ 5), compilé à chaque push.
-# L'installeur se télécharge dans l'onglet Actions, rubrique "Artifacts" du run.
+# L'installeur se télécharge dans l'onglet Actions, rubrique "Artifacts" du run,
+# et, pour la branche kaho, dans les Releases du dépôt (lien direct, sans connexion).
 
 on:
   push:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-windows:
@@ -204,3 +208,15 @@ jobs:
           name: QLC+-${{matrix.task}}-${{env.APPVERSION}}-${{env.BUILD_DATE}}-${{env.GIT_REV}}.exe
           path: ${{matrix.task}}-${{env.OUTFILE}}
 
+      - name: Publish the installer as a release
+        if: github.ref == 'refs/heads/kaho'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ASSET="KAHO-Console-${{env.BUILD_DATE}}-${{env.GIT_REV}}.exe"
+          cp "${{matrix.task}}-${{env.OUTFILE}}" "$ASSET"
+          gh release create "kaho-${{env.BUILD_DATE}}-${{env.GIT_REV}}" "$ASSET" \
+            --repo "${{ github.repository }}" --target "${{ github.sha }}" --latest \
+            --title "KAHO Console ${{env.BUILD_DATE}} (${{env.GIT_REV}})" \
+            --notes "Installeur Windows de KAHO Console, compilé depuis le commit ${{ github.sha }}. S'installe par-dessus la version précédente."

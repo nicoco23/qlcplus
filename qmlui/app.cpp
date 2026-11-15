@@ -40,6 +40,8 @@
 #include <QFileInfo>
 #include <QFileOpenEvent>
 #include <QDir>
+#include <QStandardPaths>
+#include <QDateTime>
 #include <unistd.h>
 
 #include "app.h"
@@ -82,6 +84,8 @@
 #define SETTINGS_GEOMETRY      QStringLiteral("workspace/windowrect")
 #define SETTINGS_WORKINGPATH   QStringLiteral("workspace/workingpath")
 #define SETTINGS_RECENTFILE    QStringLiteral("workspace/recent")
+#define SETTINGS_RECOVERY      QStringLiteral("kaho/recovery")
+#define SETTINGS_RECOVERY_ORIGIN QStringLiteral("kaho/recoveryOrigin")
 #define KXMLQLCWorkspaceWindow QStringLiteral("CurrentWindow")
 
 #define MAX_RECENT_FILES    10
@@ -169,8 +173,14 @@ App::~App()
 
     /* remove autosave file if present */
     QFile asFile(autoSaveFileName());
-    if (asFile.exists())
+    if (asFile.exists() && QFileInfo(asFile).absoluteFilePath() != m_recoveryPath)
         asFile.remove();
+    // closed properly: nothing to recover (an autosave not yet answered is kept)
+    if (m_recoveryPath.isEmpty())
+    {
+        settings.remove(SETTINGS_RECOVERY);
+        settings.remove(SETTINGS_RECOVERY_ORIGIN);
+    }
 }
 
 QString App::appName() const
@@ -275,6 +285,17 @@ void App::startup()
 
     // Start up in non-modified state
     m_doc->resetModified();
+
+    // KAHO: an autosave still referenced here means the last session did not close properly
+    {
+        QSettings recovery;
+        QString path = recovery.value(SETTINGS_RECOVERY).toString();
+        if (path.isEmpty() == false && QFile::exists(path))
+        {
+            m_recoveryPath = path;
+            m_recoveryOrigin = recovery.value(SETTINGS_RECOVERY_ORIGIN).toString();
+        }
+    }
 
     QSettings settings;
     QRect rect(0, 0, 800, 600);
@@ -701,7 +722,68 @@ bool App::docModified() const
 
 void App::slotDocAutosave()
 {
-    saveXML(autoSaveFileName(), true);
+    QString path = autoSaveFileName();
+    if (saveXML(path, true) != QFile::NoError)
+        return;
+    // remembered until the session closes properly: found again at the next start after a crash
+    QSettings settings;
+    settings.setValue(SETTINGS_RECOVERY, QFileInfo(path).absoluteFilePath());
+    settings.setValue(SETTINGS_RECOVERY_ORIGIN, m_fileName);
+    settings.sync();
+}
+
+QString App::recoveryInfo() const
+{
+    if (m_recoveryPath.isEmpty())
+        return QString();
+    QFileInfo info(m_recoveryPath);
+    QString what = m_recoveryOrigin.isEmpty() ? tr("un projet jamais enregistré") : QFileInfo(m_recoveryOrigin).fileName();
+    return tr("%1 — sauvegarde automatique du %2").arg(what, QLocale().toString(info.lastModified(), QLocale::ShortFormat));
+}
+
+bool App::recoverAutosave()
+{
+    if (m_recoveryPath.isEmpty() || QFile::exists(m_recoveryPath) == false)
+        return false;
+
+    // work on a copy: loading resets the document, and the autosave of the new session
+    // may use the same file name
+    QString copy = m_recoveryPath + ".recover";
+    QFile::remove(copy);
+    if (QFile::copy(m_recoveryPath, copy) == false)
+        return false;
+
+    QString origin = m_recoveryOrigin;
+    m_recovering = true;
+    bool ok = loadWorkspace(copy);
+    m_recovering = false;
+    QFile::remove(copy);
+
+    if (ok)
+    {
+        // the recovered project keeps the name of the original file, and is not saved yet
+        setFileName(origin);
+        if (origin.isEmpty() == false)
+            m_doc->setWorkspacePath(QFileInfo(origin).absolutePath());
+        setTitle(QString("%1 - %2").arg(KAHO_TITLE).arg(origin.isEmpty() ? tr("projet récupéré") : origin));
+        m_doc->setModified();
+    }
+    m_recoveryPath.clear();
+    m_recoveryOrigin.clear();
+    emit recoveryChanged();
+    return ok;
+}
+
+void App::discardRecovery()
+{
+    if (m_recoveryPath.isEmpty() == false)
+        QFile::remove(m_recoveryPath);
+    QSettings settings;
+    settings.remove(SETTINGS_RECOVERY);
+    settings.remove(SETTINGS_RECOVERY_ORIGIN);
+    m_recoveryPath.clear();
+    m_recoveryOrigin.clear();
+    emit recoveryChanged();
 }
 
 void App::initDoc()
@@ -931,7 +1013,13 @@ QString App::autoSaveFileName() const
     QString fName = m_fileName;
 
     if (fName.isEmpty())
-        fName = "NewProject.autosave.qxw";
+    {
+        // KAHO: a project never saved has no folder: keep its autosave in the user data
+        // (the program folder may be read only)
+        QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QDir().mkpath(dir);
+        fName = dir + "/NewProject.autosave.qxw";
+    }
     else
     {
         fName.remove(".qxw");
@@ -1033,7 +1121,8 @@ bool App::loadWorkspace(const QString &fileName)
     {
         setTitle(QString("%1 - %2").arg(KAHO_TITLE).arg(localFilename));
         setFileName(localFilename);
-        updateRecentFilesList(localFilename);
+        if (m_recovering == false)
+            updateRecentFilesList(localFilename);
         setDocLoaded(true);
         m_doc->resetModified();
         m_videoProvider = new VideoProvider(this, m_doc);
@@ -1152,12 +1241,22 @@ bool App::saveWorkspace(const QString &fileName)
        can be loaded even if the workspace file will be moved */
     m_doc->setWorkspacePath(QFileInfo(localFilename).absolutePath());
 
+    // KAHO: keep the previous version of the file next to it
+    if (!localFilename.startsWith("content:") && QFile::exists(localFilename))
+    {
+        QFile::remove(localFilename + ".bak");
+        QFile::copy(localFilename, localFilename + ".bak");
+    }
+
     if (saveXML(localFilename) == QFile::NoError)
     {
         /* remove autosave file if present */
         QFile asFile(asfName);
         if (asFile.exists())
             asFile.remove();
+        QSettings recovery;
+        recovery.remove(SETTINGS_RECOVERY);
+        recovery.remove(SETTINGS_RECOVERY_ORIGIN);
 
         setTitle(QString("%1 - %2").arg(KAHO_TITLE).arg(localFilename));
         updateRecentFilesList(localFilename);

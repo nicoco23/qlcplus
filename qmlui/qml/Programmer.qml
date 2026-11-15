@@ -964,7 +964,8 @@ Rectangle
             Layout.fillWidth: true
             Layout.preferredHeight: pgRoot.unit * 5.3
             title: qsTr("EFFETS")
-            hint: qsTr("un effet par famille · re-cliquer l'arrête · il suit le tempo réglé à droite")
+            hint: programmer.effectCount > 1 ? qsTr("%1 effets en cours · taille, phase et vitesse règlent ceux de la sélection").arg(programmer.effectCount)
+                                             : qsTr("un effet par famille et par machine · une autre sélection peut avoir le sien · re-cliquer l'arrête")
             enabled: pgRoot.hasSelection
             opacity: enabled ? 1 : 0.5
 
@@ -1009,9 +1010,10 @@ Rectangle
                                     Layout.fillWidth: true
                                     Layout.fillHeight: true
                                     text: modelData.label
-                                    fontSize: UISettings.textSizeDefault * 0.62
+                                    fontSize: UISettings.textSizeDefault * 0.55
                                     lit: modelData.running
                                     keyColor: parent.kindColor
+                                    subText: modelData.elsewhere && !modelData.running ? qsTr("ailleurs") : ""
                                     onClicked: programmer.toggleEffect(modelData.key)
                                 }
                             }
@@ -1023,7 +1025,7 @@ Rectangle
                 {
                     Layout.fillHeight: true
                     Layout.fillWidth: false
-                    Layout.preferredWidth: pgRoot.unit * 7
+                    Layout.preferredWidth: pgRoot.unit * 6
                     spacing: 2
                     HSlider
                     {
@@ -1062,14 +1064,6 @@ Rectangle
                             onClicked: programmer.tap()
                         }
                     }
-                    HSlider
-                    {
-                        Layout.fillWidth: true
-                        label: qsTr("Taille")
-                        value: programmer.effectSize
-                        valueText: Math.round(programmer.effectSize * 100) + "%"
-                        onMoved: (v) => programmer.effectSize = v
-                    }
                     RowLayout
                     {
                         Layout.fillWidth: true
@@ -1078,7 +1072,8 @@ Rectangle
                         {
                             Layout.fillWidth: true
                             Layout.preferredHeight: pgRoot.unit * 0.8
-                            text: qsTr("½")
+                            text: qsTr("TEMPO ½")
+                            fontSize: UISettings.textSizeDefault * 0.58
                             onClicked: programmer.tempoSource === "manual" ? programmer.effectBpm = programmer.effectBpm / 2
                                                                            : programmer.tempoMultiplier = programmer.tempoMultiplier / 2
                         }
@@ -1086,19 +1081,53 @@ Rectangle
                         {
                             Layout.fillWidth: true
                             Layout.preferredHeight: pgRoot.unit * 0.8
-                            text: qsTr("×2")
+                            text: qsTr("TEMPO ×2")
+                            fontSize: UISettings.textSizeDefault * 0.58
                             onClicked: programmer.tempoSource === "manual" ? programmer.effectBpm = programmer.effectBpm * 2
                                                                            : programmer.tempoMultiplier = programmer.tempoMultiplier * 2
                         }
-                        ConsoleKey
+                    }
+                }
+
+                // shape of the effects of the selection
+                ColumnLayout
+                {
+                    Layout.fillHeight: true
+                    Layout.fillWidth: false
+                    Layout.preferredWidth: pgRoot.unit * 5.6
+                    spacing: 2
+                    HSlider
+                    {
+                        Layout.fillWidth: true
+                        label: qsTr("Taille")
+                        value: programmer.effectSize
+                        valueText: Math.round(programmer.effectSize * 100) + "%"
+                        onMoved: (v) => programmer.effectSize = v
+                    }
+                    HSlider
+                    {
+                        Layout.fillWidth: true
+                        label: qsTr("Phase")
+                        value: programmer.effectPhase / 360
+                        valueText: programmer.effectPhase < 1 ? qsTr("ensemble") : Math.round(programmer.effectPhase) + "°"
+                        onMoved: (v) => programmer.effectPhase = Math.round(v * 24) * 15
+                    }
+                    RowLayout
+                    {
+                        Layout.fillWidth: true
+                        spacing: pgRoot.gap
+                        Repeater
                         {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: pgRoot.unit * 0.8
-                            Layout.preferredWidth: 2
-                            text: programmer.effectSpread ? qsTr("DÉCALÉ") : qsTr("ENSEMBLE")
-                            lit: programmer.effectSpread
-                            fontSize: UISettings.textSizeDefault * 0.6
-                            onClicked: programmer.effectSpread = !programmer.effectSpread
+                            model: [ { r: 0.25, l: "÷4" }, { r: 0.5, l: "÷2" }, { r: 1, l: "×1" }, { r: 2, l: "×2" }, { r: 4, l: "×4" } ]
+                            ConsoleKey
+                            {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: pgRoot.unit * 0.8
+                                text: modelData.l
+                                fontSize: UISettings.textSizeDefault * 0.6
+                                lit: Math.abs(programmer.effectRate - modelData.r) < 0.01
+                                onClicked: programmer.effectRate = modelData.r
+                            }
                         }
                     }
                 }

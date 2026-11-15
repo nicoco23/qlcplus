@@ -52,6 +52,7 @@ set(SRC_FILES
     playbackmanager.cpp playbackmanager.h
     programmermanager.cpp programmermanager.h
     programmercommands.cpp
+    programmerextras.cpp
     linkclock.cpp linkclock.h
     kahostageimport.cpp kahostageimport.h
     previewcontext.cpp previewcontext.h

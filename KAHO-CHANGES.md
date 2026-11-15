@@ -92,6 +92,26 @@ the fork changes. All original copyright notices are kept.
 - **Presets followed by cues**: a cue recorded from a colour or position
   preset keeps a link to it (`<Link>` entries); storing the preset again
   updates every linked cue, live if it is running.
+- **Undo, macros, views** (`qmlui/programmerextras.cpp`): `Oops` takes back the
+  last recording type action (store, update, delete, preset or macro change,
+  playback assignment, cue timing, clear of the programmer) from a snapshot of
+  what these actions can touch; up to 25 steps. Macros (16, a named list of
+  commands) and views (6, a window + a playback page) are saved as `<Macro>`
+  and `<View>` entries of the `<Programmer>` element.
+- **Cue timings**: cue stacks use per-step fade in, fade out and follow time
+  (`PlaybackManager::setCueTiming()`, `cueStep()`, `usePerStepTimings()`),
+  editable in the sequence sheet and with `Exec 2 Cue 3 Fade 1.5 Follow 4`.
+- **Several effects at once**: the programmer keeps one effect per family and
+  per fixture, so different selections run their own; size, phase (EFX start
+  offsets) and rate against the tempo are kept per effect.
+- **Akai APC mini pad modes**: SHIFT + first scene button switches the pads
+  between the execute buttons and groups / colour presets / position presets /
+  programmer keys (`PlaybackManager::apcMode`, `ProgrammerManager::slotGridPad()`).
+- **Crash recovery** (`qmlui/app.*`): the autosave of a session that did not
+  close properly is offered at the next start; a project never saved keeps its
+  autosave in the user data folder; saving keeps the previous file as `.bak`.
+  `engine/src/doc.cpp`: the autosave countdown is no longer restarted by every
+  change.
 - **KahoStage scene import** (`qmlui/kahostageimport.*`, Actions menu > File):
   reads the `KahoStage-scene.json` written by the KahoStage Minecraft plugin
   and places the fixtures (matched by name) and the trusses in the 2D / 3D
@@ -105,4 +125,4 @@ the fork changes. All original copyright notices are kept.
   `qmlui/qmlui.qrc`, `resources/fonts/fonts.qrc`,
   `qmlui/CMakeLists.txt`.
 - CI: `.github/workflows/kaho-windows.yml` builds the Windows installer on every
-  push; the upstream matrix (`build.yml`) only runs on pull requests or on demand.
+  push and publishes it as a GitHub release for the `kaho` branch; the upstream matrix (`build.yml`) only runs on pull requests or on demand.

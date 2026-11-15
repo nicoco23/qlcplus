@@ -64,6 +64,7 @@ class App final : public QQuickView
     Q_PROPERTY(bool docLoaded READ docLoaded NOTIFY docLoadedChanged)
     Q_PROPERTY(bool docModified READ docModified NOTIFY docModifiedChanged)
     Q_PROPERTY(QStringList recentFiles READ recentFiles NOTIFY recentFilesChanged)
+    Q_PROPERTY(QString recoveryInfo READ recoveryInfo NOTIFY recoveryChanged)
     Q_PROPERTY(QString workingPath READ workingPath WRITE setWorkingPath NOTIFY workingPathChanged)
     Q_PROPERTY(int accessMask READ accessMask WRITE setAccessMask NOTIFY accessMaskChanged)
     Q_PROPERTY(int runningFunctionsCount READ runningFunctionsCount NOTIFY runningFunctionsCountChanged)
@@ -309,6 +310,7 @@ private:
 signals:
     void docLoadedChanged();
     void docModifiedChanged();
+    void recoveryChanged();
     void runningFunctionsCountChanged();
 
 private:
@@ -344,6 +346,12 @@ public:
      * of the current workspace file
      */
     QString autoSaveFileName() const;
+
+    /* KAHO: recovery after a crash. The autosave left by a session that did not close
+     * properly is offered at the next start */
+    QString recoveryInfo() const;
+    Q_INVOKABLE bool recoverAutosave();
+    Q_INVOKABLE void discardRecovery();
 
     /** Return the list of the recently opened files */
     QStringList recentFiles() const;
@@ -411,6 +419,9 @@ public slots:
 
 private:
     QString m_fileName;
+    QString m_recoveryPath;
+    QString m_recoveryOrigin;
+    bool m_recovering = false;
     QStringList m_recentFiles;
     QString m_workingPath;
 

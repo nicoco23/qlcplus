@@ -343,7 +343,9 @@ bool Doc::isModified() const
 void Doc::setModified()
 {
     m_modified = true;
-    m_autosaveTimer.start();
+    // KAHO: do not restart the countdown at every change, or a busy session is never saved
+    if (m_autosaveTimer.isActive() == false)
+        m_autosaveTimer.start();
     emit modified(true);
 }
 

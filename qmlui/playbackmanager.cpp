@@ -33,6 +33,7 @@
 #include "function.h"
 #include "chaserstep.h"
 #include "chaser.h"
+#include "collection.h"
 #include "doc.h"
 
 #define KXMLQLCPlaybacksPage      QStringLiteral("Page")
@@ -83,6 +84,7 @@ PlaybackManager::PlaybackManager(QQuickView *view, Doc *doc, QObject *parent)
     , m_execs(PageCount * ExecCount)
     , m_pageNames(PageCount)
     , m_armedFunction(Function::invalidId())
+    , m_apcMode("exec")
     , m_grandMasterCache(-1)
     , m_refreshTicks(0)
     , m_controllerUniverse(0xFFFFFFFF)
@@ -482,6 +484,7 @@ void PlaybackManager::assignFader(int index, quint32 functionId)
     if (index < 0 || index >= FaderCount)
         return;
 
+    emit aboutToChange(tr("playback %1").arg(index + 1));
     FaderState &st = fader(m_page, index);
     if (st.functionId != functionId)
         stopFunction(functionAt(st.functionId), parentId(true, m_page, index));
@@ -542,6 +545,7 @@ void PlaybackManager::assignExec(int index, quint32 functionId)
     if (index < 0 || index >= ExecCount)
         return;
 
+    emit aboutToChange(tr("bouton %1").arg(index + 1));
     ExecState &st = exec(m_page, index);
     if (st.functionId != functionId)
         stopFunction(functionAt(st.functionId), parentId(false, m_page, index));
@@ -559,6 +563,7 @@ void PlaybackManager::setExecFlashMode(int index, bool flash)
     ExecState &st = exec(m_page, index);
     if (st.flashMode == flash)
         return;
+    emit aboutToChange(tr("mode du bouton %1").arg(index + 1));
     st.flashMode = flash;
     st.flashStarted = false;
     m_doc->setModified();
@@ -569,6 +574,7 @@ void PlaybackManager::setFaderLabel(int index, const QString &label)
 {
     if (index < 0 || index >= FaderCount)
         return;
+    emit aboutToChange(tr("nom ou couleur"));
     fader(m_page, index).label = label.trimmed();
     m_doc->setModified();
     slotRefresh();
@@ -578,6 +584,7 @@ void PlaybackManager::setFaderColor(int index, const QString &color)
 {
     if (index < 0 || index >= FaderCount)
         return;
+    emit aboutToChange(tr("nom ou couleur"));
     fader(m_page, index).color = color;
     m_doc->setModified();
     slotRefresh();
@@ -587,6 +594,7 @@ void PlaybackManager::setExecLabel(int index, const QString &label)
 {
     if (index < 0 || index >= ExecCount)
         return;
+    emit aboutToChange(tr("nom ou couleur"));
     exec(m_page, index).label = label.trimmed();
     m_doc->setModified();
     slotRefresh();
@@ -596,6 +604,7 @@ void PlaybackManager::setExecColor(int index, const QString &color)
 {
     if (index < 0 || index >= ExecCount)
         return;
+    emit aboutToChange(tr("nom ou couleur"));
     exec(m_page, index).color = color;
     m_doc->setModified();
     slotRefresh();
@@ -605,6 +614,7 @@ void PlaybackManager::moveFader(int from, int to)
 {
     if (from < 0 || from >= FaderCount || to < 0 || to >= FaderCount || from == to)
         return;
+    emit aboutToChange(tr("déplacement"));
     // a running playback keeps running: only its slot (and parent id) changes
     FaderState &a = fader(m_page, from);
     FaderState &b = fader(m_page, to);
@@ -623,6 +633,7 @@ void PlaybackManager::moveExec(int from, int to)
 {
     if (from < 0 || from >= ExecCount || to < 0 || to >= ExecCount || from == to)
         return;
+    emit aboutToChange(tr("déplacement"));
     std::swap(exec(m_page, from), exec(m_page, to));
     exec(m_page, from).flashStarted = false;
     exec(m_page, to).flashStarted = false;
@@ -657,6 +668,7 @@ void PlaybackManager::setPageName(int page, const QString &name)
 {
     if (page < 0 || page >= PageCount)
         return;
+    emit aboutToChange(tr("nom de page"));
     m_pageNames[page] = name.trimmed();
     m_doc->setModified();
     slotRefresh();
@@ -690,7 +702,10 @@ QVariantList PlaybackManager::cueList(int index)
         row.insert("number", 1);
         row.insert("name", f->name());
         row.insert("type", Function::typeToString(f->type()));
-        row.insert("fade", f->fadeInSpeed() / 1000.0);
+        row.insert("fade", cueStep(f, m_doc).fadeIn / 1000.0);
+        row.insert("out", cueStep(f, m_doc).fadeOut / 1000.0);
+        row.insert("follow", -1.0);
+        row.insert("stack", false);
         row.insert("current", f->isRunning());
         list.append(row);
         return list;
@@ -704,11 +719,257 @@ QVariantList PlaybackManager::cueList(int index)
         row.insert("number", i + 1);
         row.insert("name", sf ? sf->name() : tr("(supprimé)"));
         row.insert("type", sf ? Function::typeToString(sf->type()) : QString());
-        row.insert("fade", sf ? sf->fadeInSpeed() / 1000.0 : 0.0);
+        bool perStep = stack->durationMode() == Chaser::PerStep;
+        row.insert("fade", stack->fadeInMode() == Chaser::PerStep ? step->fadeIn / 1000.0 : cueStep(sf, m_doc).fadeIn / 1000.0);
+        row.insert("out", stack->fadeOutMode() == Chaser::PerStep ? step->fadeOut / 1000.0 : cueStep(sf, m_doc).fadeOut / 1000.0);
+        row.insert("follow", perStep && step->duration != Function::infiniteSpeed() ? step->hold / 1000.0 : -1.0);
+        row.insert("stack", true);
         row.insert("current", i == current);
         list.append(row);
     }
     return list;
+}
+
+ChaserStep PlaybackManager::cueStep(Function *cue, Doc *doc)
+{
+    ChaserStep step(cue ? cue->id() : Function::invalidId());
+    // a cue made of a base scene and effects fades like its scene
+    Function *timed = cue;
+    Collection *coll = qobject_cast<Collection *>(cue);
+    if (coll != nullptr)
+    {
+        for (quint32 id : coll->functions())
+        {
+            Function *f = doc->function(id);
+            if (f != nullptr && f->type() == Function::SceneType)
+            {
+                timed = f;
+                break;
+            }
+        }
+    }
+    step.fadeIn = timed ? timed->fadeInSpeed() : 0;
+    step.fadeOut = timed ? timed->fadeOutSpeed() : 0;
+    step.hold = Function::infiniteSpeed();
+    step.duration = Function::infiniteSpeed();
+    return step;
+}
+
+void PlaybackManager::usePerStepTimings(Chaser *stack, Doc *doc)
+{
+    if (stack == nullptr)
+        return;
+    if (stack->fadeInMode() == Chaser::PerStep && stack->fadeOutMode() == Chaser::PerStep
+        && stack->durationMode() == Chaser::PerStep)
+        return;
+
+    bool hadDuration = stack->durationMode() == Chaser::PerStep;
+    uint common = stack->duration();
+    for (int i = 0; i < stack->stepsCount(); i++)
+    {
+        ChaserStep step = *stack->stepAt(i);
+        Function *f = doc->function(step.fid);
+        if (stack->fadeInMode() != Chaser::PerStep)
+            step.fadeIn = stack->fadeInMode() == Chaser::Common ? stack->fadeInSpeed() : cueStep(f, doc).fadeIn;
+        if (stack->fadeOutMode() != Chaser::PerStep)
+            step.fadeOut = stack->fadeOutMode() == Chaser::Common ? stack->fadeOutSpeed() : cueStep(f, doc).fadeOut;
+        if (hadDuration == false)
+        {
+            step.duration = common;
+            step.hold = common == Function::infiniteSpeed() ? common : (common > step.fadeIn ? common - step.fadeIn : 0);
+        }
+        stack->replaceStep(step, i);
+    }
+    stack->setFadeInMode(Chaser::PerStep);
+    stack->setFadeOutMode(Chaser::PerStep);
+    stack->setDurationMode(Chaser::PerStep);
+}
+
+void PlaybackManager::setCueTiming(int index, int step, const QString &what, qreal seconds)
+{
+    if (index < 0 || index >= FaderCount)
+        return;
+    Function *f = functionAt(fader(m_page, index).functionId);
+    if (f == nullptr)
+        return;
+    uint ms = uint(qRound(qBound(0.0, seconds, 3600.0) * 1000));
+
+    Chaser *stack = qobject_cast<Chaser *>(f);
+    if (stack == nullptr)
+    {
+        // a single cue: its own fades, nothing to follow
+        emit aboutToChange(tr("temps du cue"));
+        Function *timed = m_doc->function(cueStep(f, m_doc).fid);
+        Collection *coll = qobject_cast<Collection *>(f);
+        if (coll != nullptr)
+            for (quint32 id : coll->functions())
+                if (m_doc->function(id) && m_doc->function(id)->type() == Function::SceneType)
+                {
+                    timed = m_doc->function(id);
+                    break;
+                }
+        if (timed == nullptr) return;
+        if (what == "fade") timed->setFadeInSpeed(ms);
+        else if (what == "out") timed->setFadeOutSpeed(ms);
+        else return;
+    }
+    else
+    {
+        if (step < 0 || step >= stack->stepsCount())
+            return;
+        emit aboutToChange(tr("temps du cue %1").arg(step + 1));
+        usePerStepTimings(stack, m_doc);
+        ChaserStep cs = *stack->stepAt(step);
+        bool waits = cs.duration == Function::infiniteSpeed();
+        if (what == "fade")
+        {
+            cs.fadeIn = ms;
+            if (waits == false)
+                cs.duration = cs.fadeIn + cs.hold;
+        }
+        else if (what == "out")
+            cs.fadeOut = ms;
+        else if (what == "follow")
+        {
+            if (seconds < 0)
+                cs.hold = cs.duration = Function::infiniteSpeed();
+            else
+            {
+                cs.hold = ms;
+                cs.duration = cs.fadeIn + cs.hold;
+            }
+        }
+        else
+            return;
+        stack->replaceStep(cs, step);
+    }
+    m_doc->setModified();
+    slotRefresh();
+    m_cueRevision++;
+    emit cueRevisionChanged();
+}
+
+void PlaybackManager::renameCue(int index, int step, const QString &name)
+{
+    if (index < 0 || index >= FaderCount || name.trimmed().isEmpty())
+        return;
+    Function *f = functionAt(fader(m_page, index).functionId);
+    Chaser *stack = qobject_cast<Chaser *>(f);
+    if (stack != nullptr)
+    {
+        ChaserStep *cs = stack->stepAt(step);
+        f = cs ? functionAt(cs->fid) : nullptr;
+    }
+    if (f == nullptr)
+        return;
+    emit aboutToChange(tr("nom du cue"));
+    f->setName(name.trimmed());
+    m_doc->setModified();
+    slotFunctionsChanged();
+    m_cueRevision++;
+    emit cueRevisionChanged();
+}
+
+void PlaybackManager::deleteCue(int index, int step)
+{
+    if (index < 0 || index >= FaderCount)
+        return;
+    Chaser *stack = qobject_cast<Chaser *>(functionAt(fader(m_page, index).functionId));
+    if (stack == nullptr || step < 0 || step >= stack->stepsCount() || stack->stepsCount() < 2)
+        return;
+    emit aboutToChange(tr("cue %1 retiré").arg(step + 1));
+    if (stack->isRunning())
+        stopFunction(stack, parentId(true, m_page, index));
+    stack->removeStep(step);
+    m_doc->setModified();
+    slotRefresh();
+    m_cueRevision++;
+    emit cueRevisionChanged();
+}
+
+void PlaybackManager::moveCue(int index, int step, int delta)
+{
+    if (index < 0 || index >= FaderCount)
+        return;
+    Chaser *stack = qobject_cast<Chaser *>(functionAt(fader(m_page, index).functionId));
+    int to = step + delta;
+    if (stack == nullptr || step < 0 || step >= stack->stepsCount() || to < 0 || to >= stack->stepsCount())
+        return;
+    emit aboutToChange(tr("ordre des cues"));
+    stack->moveStep(step, to);
+    m_doc->setModified();
+    slotRefresh();
+    m_cueRevision++;
+    emit cueRevisionChanged();
+}
+
+void PlaybackManager::renameFunction(quint32 functionId, const QString &name)
+{
+    Function *f = functionAt(functionId);
+    if (f == nullptr || name.trimmed().isEmpty())
+        return;
+    emit aboutToChange(tr("nom"));
+    f->setName(name.trimmed());
+    m_doc->setModified();
+    slotFunctionsChanged();
+    m_cueRevision++;
+    emit cueRevisionChanged();
+}
+
+void PlaybackManager::restoreLayout(const Layout &layout)
+{
+    if (layout.faders.count() != m_faders.count() || layout.execs.count() != m_execs.count())
+        return;
+    for (int i = 0; i < m_faders.count(); i++)
+    {
+        FaderState &st = m_faders[i];
+        const FaderState &old = layout.faders.at(i);
+        if (st.functionId != old.functionId)
+        {
+            stopFunction(functionAt(st.functionId), parentId(true, i / FaderCount, i % FaderCount));
+            st = FaderState();
+            st.functionId = old.functionId;
+        }
+        st.label = old.label;
+        st.color = old.color;
+    }
+    for (int i = 0; i < m_execs.count(); i++)
+    {
+        ExecState &st = m_execs[i];
+        const ExecState &old = layout.execs.at(i);
+        if (st.functionId != old.functionId)
+        {
+            stopFunction(functionAt(st.functionId), parentId(false, i / ExecCount, i % ExecCount));
+            st = ExecState();
+            st.functionId = old.functionId;
+        }
+        st.label = old.label;
+        st.color = old.color;
+        st.flashMode = old.flashMode;
+    }
+    m_pageNames = layout.pageNames;
+    m_doc->setModified();
+    slotFunctionsChanged();
+    slotRefresh();
+    m_cueRevision++;
+    emit cueRevisionChanged();
+}
+
+void PlaybackManager::setApcMode(const QString &mode)
+{
+    QString m = mode == "prog" ? "prog" : "exec";
+    if (m == m_apcMode)
+        return;
+    m_apcMode = m;
+    emit apcModeChanged();
+    updateControllerLeds(true);
+}
+
+void PlaybackManager::setGridLeds(const QVector<uchar> &leds)
+{
+    m_gridLeds = leds;
+    if (m_apcMode == "prog")
+        updateControllerLeds(false);
 }
 
 QString PlaybackManager::pickMode() const
@@ -1031,6 +1292,11 @@ void PlaybackManager::updateControllerLeds(bool force)
     {
         int row = i / ExecColumns, col = i % ExecColumns;
         quint32 note = APC_GRID_FIRST + (ExecRows - row) * 8 + col;
+        if (m_apcMode == "prog")
+        {
+            sendLed(note, i < m_gridLeds.count() ? m_gridLeds.at(i) : uchar(LED_OFF), force);
+            continue;
+        }
         Function *f = functionAt(exec(m_page, i).functionId);
         uchar led = f == nullptr ? LED_OFF : (f->isRunning() ? LED_GREEN : LED_YELLOW);
         sendLed(note, led, force);
@@ -1109,6 +1375,11 @@ void PlaybackManager::slotInputValueChanged(quint32 universe, quint32 channel, u
         int row = int(note) / 8, col = int(note) % 8;
         if (row == 0)
             flash(col, pressed);
+        else if (m_apcMode == "prog")
+        {
+            if (pressed)
+                emit gridPad(ExecRows - row, col, m_shift);
+        }
         else
             execPress((ExecRows - row) * ExecColumns + col, pressed);
         return;
@@ -1132,6 +1403,8 @@ void PlaybackManager::slotInputValueChanged(quint32 universe, quint32 channel, u
         {
             if (m_shift && note == APC_SCENE_FIRST + PageCount - 1)
                 releaseAll();  // SHIFT + last scene button = release all
+            else if (m_shift && note == APC_SCENE_FIRST)
+                setApcMode(m_apcMode == "prog" ? "exec" : "prog");  // SHIFT + first scene button = pad mode
             else
                 setPage(int(note - APC_SCENE_FIRST));
         }

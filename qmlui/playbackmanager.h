@@ -31,6 +31,8 @@
 class QXmlStreamReader;
 class QXmlStreamWriter;
 class Function;
+class Chaser;
+class ChaserStep;
 class Doc;
 
 #define KXMLQLCPlaybacks QStringLiteral("Playbacks")
@@ -60,6 +62,8 @@ class PlaybackManager final : public PreviewContext
     Q_PROPERTY(quint32 armedFunction READ armedFunction WRITE setArmedFunction NOTIFY armedFunctionChanged)
     Q_PROPERTY(QString pickMode READ pickMode WRITE setPickMode NOTIFY pickModeChanged)
     Q_PROPERTY(QVariantList runningIds READ runningIds NOTIFY runningIdsChanged)
+    Q_PROPERTY(QString apcMode READ apcMode WRITE setApcMode NOTIFY apcModeChanged)
+    Q_PROPERTY(int cueRevision READ cueRevision NOTIFY cueRevisionChanged)
 
 public:
     static const int PageCount = 8;      // one per APC mini scene button
@@ -136,6 +140,31 @@ public:
     /** Cues of a playback of the current page: one row per step of a cue stack */
     Q_INVOKABLE QVariantList cueList(int index);
 
+    /* Cue timings of a playback of the current page (step = 0-based cue).
+     * what: "fade" (fade in), "out" (fade out) or "follow" (seconds before the next cue
+     * starts by itself, < 0 = wait for GO) */
+    Q_INVOKABLE void setCueTiming(int index, int step, const QString &what, qreal seconds);
+    Q_INVOKABLE void renameCue(int index, int step, const QString &name);
+    Q_INVOKABLE void deleteCue(int index, int step);
+    Q_INVOKABLE void moveCue(int index, int step, int delta);
+    /** Step of a cue stack for a cue: its own fades, waits for GO */
+    static ChaserStep cueStep(Function *cue, Doc *doc);
+    /** Make a cue stack use the timings of its steps (stacks made before had common ones) */
+    static void usePerStepTimings(Chaser *stack, Doc *doc);
+
+    /** Rename a function from the sequence pool */
+    Q_INVOKABLE void renameFunction(quint32 functionId, const QString &name);
+
+    /* Akai APC mini pad grid: "exec" = execute buttons, "prog" = groups and presets
+     * (handled by the programmer). SHIFT + first scene button switches */
+    QString apcMode() const { return m_apcMode; }
+    /** Changes whenever the cues of a playback may have changed (sequence sheet) */
+    int cueRevision() const { return m_cueRevision; }
+    void setApcMode(const QString &mode);
+    enum Led { LedOff = 0, LedGreen = 2, LedGreenBlink = 4, LedRed = 6, LedRedBlink = 8, LedYellow = 10, LedYellowBlink = 12 };
+    /** LEDs of the 7 upper pad rows in "prog" mode (row 0 = top), 56 values */
+    void setGridLeds(const QVector<uchar> &leds);
+
     /** Function held by a slot of the current page */
     quint32 slotFunction(bool isFader, int index);
     /** Put another function on a slot, keeping its name and colour */
@@ -160,6 +189,12 @@ signals:
     void pickModeChanged();
     void runningIdsChanged();
     void slotPicked(QString mode, bool isFader, int index, quint32 functionId);
+    void apcModeChanged();
+    void cueRevisionChanged();
+    /** A pad of the upper 7 rows pressed in "prog" mode (row 0 = top) */
+    void gridPad(int row, int col, bool shift);
+    /** Emitted before the user changes what the playbacks hold (undo) */
+    void aboutToChange(QString what);
 
 private slots:
     void slotRefresh();
@@ -167,7 +202,7 @@ private slots:
     void slotFunctionRemoved(quint32 id);
     void slotFunctionsChanged();
 
-private:
+public:
     struct FaderState
     {
         quint32 functionId = 0xFFFFFFFF;
@@ -190,6 +225,17 @@ private:
         QString color;
     };
 
+    /** What the playbacks hold, for undo */
+    struct Layout
+    {
+        QVector<FaderState> faders;
+        QVector<ExecState> execs;
+        QStringList pageNames;
+    };
+    Layout layout() const { return { m_faders, m_execs, m_pageNames }; }
+    void restoreLayout(const Layout &layout);
+
+private:
     FaderState &fader(int page, int index);
     ExecState &exec(int page, int index);
     Function *functionAt(quint32 id) const;
@@ -214,6 +260,9 @@ private:
     QStringList m_pageNames;        // PageCount
     quint32 m_armedFunction;
     QString m_pickMode;
+    QString m_apcMode;
+    int m_cueRevision = 0;
+    QVector<uchar> m_gridLeds;
     QVariantList m_runningIds;
 
     QVariantList m_fadersCache;

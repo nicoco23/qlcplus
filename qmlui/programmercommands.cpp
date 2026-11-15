@@ -504,6 +504,139 @@ QString ProgrammerManager::runCommand(const QStringList &tokens, bool &ok)
             continue;
         }
 
+        if ((t == "phase") && pos + 1 < tokens.count() && isNumber(tokens.at(pos + 1)))
+        {
+            setEffectPhase(tokens.at(pos + 1).toDouble());
+            pos += 2;
+            done.append(tr("phase %1°").arg(qRound(effectPhase())));
+            continue;
+        }
+        if ((t == "rate" || t == "vitesse") && pos + 1 < tokens.count())
+        {
+            // "Rate 2", "Rate 0.5" or "Rate 1/2"
+            QString v = tokens.at(pos + 1);
+            qreal rate = 0;
+            if (v.contains('/'))
+            {
+                QStringList parts = v.split('/');
+                if (parts.count() == 2 && parts.at(1).toDouble() > 0)
+                    rate = parts.at(0).toDouble() / parts.at(1).toDouble();
+            }
+            else
+                rate = v.toDouble();
+            if (rate <= 0)
+                return fail(tr("Rate : 0.25, 0.5, 1, 2 ou 4"));
+            setEffectRate(rate);
+            pos += 2;
+            done.append(tr("vitesse des effets ×%1").arg(effectRate()));
+            continue;
+        }
+
+        /* ---------------- undo, macros, views */
+        if (t == "oops" || t == "undo" || t == "annuler")
+        {
+            QString what = undoText();
+            if (undo() == false)
+                return fail(tr("Rien à annuler"));
+            done.append(tr("annulé : %1").arg(what));
+            return done.join(" · ");
+        }
+        if (t == "macro" && pos + 1 < tokens.count() && isNumber(tokens.at(pos + 1)))
+        {
+            int n = tokens.at(pos + 1).toInt();
+            if (n < 1 || n > MacroCount || m_macros.at(n - 1).commands.isEmpty())
+                return fail(tr("La macro %1 est vide").arg(n));
+            if (m_macroDepth >= 4)
+                return fail(tr("Macros imbriquées trop profondément"));
+            QString label = m_macros.at(n - 1).name;
+            macroRun(n - 1);
+            return tr("macro « %1 »").arg(label);
+        }
+        if ((t == "view" || t == "vue") && pos + 1 < tokens.count() && isNumber(tokens.at(pos + 1)))
+        {
+            int n = tokens.at(pos + 1).toInt();
+            if (n < 1 || n > ViewCount || m_views.at(n - 1).used == false)
+                return fail(tr("La vue %1 est vide").arg(n));
+            viewRecall(n - 1);
+            pos += 2;
+            done.append(tr("vue « %1 »").arg(m_views.at(n - 1).name));
+            continue;
+        }
+        if (t == "apc" && pos + 1 < tokens.count())
+        {
+            QString mode = tokens.at(pos + 1);
+            if (mode != "exec" && mode != "prog")
+                return fail(tr("Apc : Exec ou Prog"));
+            m_playbacks->setApcMode(mode);
+            pos += 2;
+            done.append(mode == "prog" ? tr("APC : groupes et presets") : tr("APC : exécuteurs"));
+            continue;
+        }
+
+        /* ---------------- cue timings: Exec 2 Cue 3 Fade 1.5 | Out 2 | Follow 4 | Follow Off | Label "nom" | Delete */
+        if ((t == "exec" || t == "executor" || t == "playback" || t == "pb") && pos + 3 < tokens.count()
+            && isNumber(tokens.at(pos + 1)) && tokens.at(pos + 2) == "cue" && isNumber(tokens.at(pos + 3)))
+        {
+            int slot = tokens.at(pos + 1).toInt() - 1;
+            int cue = tokens.at(pos + 3).toInt() - 1;
+            if (slot < 0 || slot >= PlaybackManager::FaderCount)
+                return fail(tr("Exec : numéro de 1 à %1").arg(PlaybackManager::FaderCount));
+            int cues = int(m_playbacks->cueList(slot).count());
+            if (cue < 0 || cue >= cues)
+                return fail(tr("L'exécuteur %1 a %2 cue(s)").arg(slot + 1).arg(cues));
+            pos += 4;
+            if (pos >= tokens.count())
+                return fail(tr("Après Cue N : Fade, Out, Follow, Label ou Delete"));
+            bool any = false;
+            while (pos < tokens.count())
+            {
+                QString prop = tokens.at(pos);
+                if (prop == "delete" || prop == "supprimer")
+                {
+                    if (cues < 2)
+                        return fail(tr("Un exécuteur garde au moins un cue (Delete Exec %1 pour le vider)").arg(slot + 1));
+                    m_playbacks->deleteCue(slot, cue);
+                    done.append(tr("cue %1 retiré de l'exécuteur %2").arg(cue + 1).arg(slot + 1));
+                    return done.join(" · ");
+                }
+                if (prop == "label" || prop == "nom")
+                {
+                    if (name(pos + 1).isEmpty())
+                        return fail(tr("Label : nom entre guillemets attendu"));
+                    m_playbacks->renameCue(slot, cue, name(pos + 1));
+                    done.append(tr("cue %1 renommé").arg(cue + 1));
+                    return done.join(" · ");
+                }
+                QString what = (prop == "fade" || prop == "fondu" || prop == "in") ? "fade"
+                               : (prop == "out" || prop == "sortie") ? "out"
+                               : (prop == "follow" || prop == "suite") ? "follow" : QString();
+                if (what.isEmpty() || pos + 1 >= tokens.count())
+                    break;
+                QString v = tokens.at(pos + 1);
+                if (what == "follow" && (v == "off" || v == "go"))
+                {
+                    m_playbacks->setCueTiming(slot, cue, what, -1);
+                    done.append(tr("cue %1 : attend GO").arg(cue + 1));
+                }
+                else if (isNumber(v))
+                {
+                    if (what == "follow" && cues < 2)
+                        return fail(tr("Follow : il faut une pile d'au moins deux cues"));
+                    m_playbacks->setCueTiming(slot, cue, what, v.toDouble());
+                    done.append(what == "fade" ? tr("cue %1 : fondu %2 s").arg(cue + 1).arg(v.toDouble())
+                                : what == "out" ? tr("cue %1 : sortie %2 s").arg(cue + 1).arg(v.toDouble())
+                                : tr("cue %1 : suite après %2 s").arg(cue + 1).arg(v.toDouble()));
+                }
+                else
+                    return fail(tr("%1 : durée en secondes attendue").arg(prop));
+                pos += 2;
+                any = true;
+            }
+            if (any == false || pos < tokens.count())
+                return fail(tr("Après Cue N : Fade, Out, Follow, Label ou Delete"));
+            return done.join(" · ");
+        }
+
         /* ---------------- programmer */
         if (t == "clear")
         {
@@ -526,6 +659,29 @@ QString ProgrammerManager::runCommand(const QStringList &tokens, bool &ok)
             int p = pos + 1;
             QString kind;
             int index = -1;
+            if (p + 1 < tokens.count() && (tokens.at(p) == "view" || tokens.at(p) == "vue") && isNumber(tokens.at(p + 1)))
+            {
+                int n = tokens.at(p + 1).toInt();
+                if (n < 1 || n > ViewCount)
+                    return fail(tr("Vue de 1 à %1").arg(ViewCount));
+                viewStore(n - 1, name(p + 2));
+                done.append(tr("vue %1 enregistrée").arg(n));
+                return done.join(" · ");
+            }
+            if (p + 1 < tokens.count() && tokens.at(p) == "macro" && isNumber(tokens.at(p + 1)))
+            {
+                // Store Macro 3 "nom" "Group 1 At 50; Go 2"
+                int n = tokens.at(p + 1).toInt();
+                if (n < 1 || n > MacroCount)
+                    return fail(tr("Macro de 1 à %1").arg(MacroCount));
+                QString label = name(p + 2), text = name(p + 3);
+                if (text.isEmpty()) { text = label; label = QString(); }
+                if (text.isEmpty())
+                    return fail(tr("Store Macro N \"nom\" \"commandes séparées par ;\""));
+                macroStore(n - 1, label, text);
+                done.append(tr("macro %1 enregistrée").arg(n));
+                return done.join(" · ");
+            }
             if (presetRef(p, kind, index))
             {
                 if (memoryStore(kind, index) == false)
@@ -539,6 +695,7 @@ QString ProgrammerManager::runCommand(const QStringList &tokens, bool &ok)
             }
             if (hasContent() == false)
                 return fail(tr("Le programmeur est vide"));
+            pushUndo(tr("enregistrement"));
             if (p < tokens.count() && (tokens.at(p) == "cue" || tokens.at(p) == "sequence" || tokens.at(p) == "seq"))
                 p++;
             int slot = -1;
@@ -620,6 +777,15 @@ QString ProgrammerManager::runCommand(const QStringList &tokens, bool &ok)
             int p = pos + 1;
             QString kind;
             int index = -1;
+            if (t == "delete" && p + 1 < tokens.count() && isNumber(tokens.at(p + 1))
+                && (tokens.at(p) == "macro" || tokens.at(p) == "view" || tokens.at(p) == "vue"))
+            {
+                int n = tokens.at(p + 1).toInt() - 1;
+                if (tokens.at(p) == "macro") macroClear(n);
+                else viewClear(n);
+                done.append(tokens.at(p) == "macro" ? tr("macro effacée") : tr("vue effacée"));
+                return done.join(" · ");
+            }
             if (presetRef(p, kind, index))
             {
                 if (t == "delete") memoryClear(kind, index);
@@ -636,7 +802,7 @@ QString ProgrammerManager::runCommand(const QStringList &tokens, bool &ok)
             return done.join(" · ");
         }
         if (t == "help" || t == "?" || t == "aide")
-            return tr("Group 1 Thru 3 · Fixture 4 + 6 · At 50 · Full · Color Rouge · Preset 4.2 · Effect Cercle · Store Exec 2 \"nom\" · Store Preset 4.13 · Update Exec 2 · Go 2 · GoBack 2 · Off 2 · Off All · Page 2 · Clear · ClearAll · Blackout");
+            return tr("Group 1 Thru 3 · Fixture 4 + 6 · At 50 · Full · Color Rouge · Preset 4.2 · Effect Cercle · Store Exec 2 \"nom\" · Store Preset 4.13 · Update Exec 2 · Exec 2 Cue 3 Fade 1.5 Follow 4 · Go 2 · GoBack 2 · Off 2 · Off All · Page 2 · Phase 180 · Rate 2 · Macro 1 · View 1 · Store View 1 · Oops · Clear · ClearAll · Blackout");
 
         return fail(tr("Commande inconnue : %1 (tape Help)").arg(t.startsWith('"') ? t.mid(1) : t));
     }

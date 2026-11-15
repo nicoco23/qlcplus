@@ -890,6 +890,54 @@ Rectangle
                     contextManager.detachContext("VC")
                 }
             }
+
+            /* Views: a window and a playback page on one key.
+             * Click = recall (or store on an empty key), right click = store here */
+            Row
+            {
+                Layout.fillHeight: true
+                spacing: 2
+                Repeater
+                {
+                    model: programmer.views
+                    Rectangle
+                    {
+                        width: windowKeysBar.height * 0.82
+                        height: parent.height
+                        radius: height * 0.18
+                        color: modelData.active ? UISettings.kahoMauveDeep
+                               : (viewArea.containsMouse ? UISettings.bgMedium : UISettings.bgStrong)
+                        border.color: modelData.active ? UISettings.kahoMauve
+                                      : (modelData.used ? UISettings.fgMedium : UISettings.bgControl)
+                        Text
+                        {
+                            anchors.centerIn: parent
+                            text: "V" + (index + 1)
+                            color: modelData.used ? (modelData.active ? UISettings.kahoMauveSoft : UISettings.fgLight) : UISettings.bgLighter
+                            font.family: UISettings.titleFontName
+                            font.pixelSize: Math.min(UISettings.textSizeDefault * 0.7, parent.height * 0.32)
+                        }
+                        MouseArea
+                        {
+                            id: viewArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            ToolTip.visible: containsMouse
+                            ToolTip.delay: 400
+                            ToolTip.text: modelData.used ? qsTr("%1 (page %2) · clic droit : enregistrer la vue actuelle ici").arg(modelData.name).arg(modelData.page)
+                                                         : qsTr("Vue vide · clic : enregistrer la fenêtre et la page actuelles")
+                            onClicked: (mouse) =>
+                            {
+                                if (mouse.button === Qt.RightButton || !modelData.used)
+                                    programmer.viewStore(index, "")
+                                else
+                                    programmer.viewRecall(index)
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         Shortcut { sequence: "F1"; onActivated: fnfEntry.checked = true }
@@ -933,6 +981,33 @@ Rectangle
     }
 
     PopupNetworkConnect { id: clientAccessPopup }
+
+    /* The last session did not close properly and left an autosave */
+    CustomPopupDialog
+    {
+        id: recoveryPopup
+        width: mainView.width / 2
+        title: qsTr("Reprendre le travail non enregistré ?")
+        message: qsTr("KAHO Console ne s'est pas fermée normalement la dernière fois.\n\n%1\n\n" +
+                      "Oui : rouvrir cette sauvegarde (le fichier d'origine n'est pas modifié tant que tu n'enregistres pas).\n" +
+                      "Non : l'ignorer et la supprimer.").arg(qlcplus.recoveryInfo)
+        standardButtons: Dialog.Yes | Dialog.No
+        closePolicy: Popup.NoAutoClose
+        onClicked: function(role)
+        {
+            if (role === Dialog.Yes)
+                qlcplus.recoverAutosave()
+            else
+                qlcplus.discardRecovery()
+            close()
+        }
+    }
+    Timer
+    {
+        interval: 600
+        running: true
+        onTriggered: if (qlcplus.recoveryInfo !== "") recoveryPopup.open()
+    }
 
     CustomPopupDialog
     {

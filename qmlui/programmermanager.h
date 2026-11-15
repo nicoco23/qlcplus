@@ -26,6 +26,8 @@
 #include <QMap>
 #include <QTimer>
 #include <QStringList>
+#include <QSharedPointer>
+#include <QVector>
 
 #include "previewcontext.h"
 #include "scenevalue.h"
@@ -61,6 +63,12 @@ class ProgrammerManager final : public PreviewContext
     Q_PROPERTY(qreal effectBpm READ effectBpm WRITE setEffectBpm NOTIFY effectParamsChanged)
     Q_PROPERTY(qreal effectSize READ effectSize WRITE setEffectSize NOTIFY effectParamsChanged)
     Q_PROPERTY(bool effectSpread READ effectSpread WRITE setEffectSpread NOTIFY effectParamsChanged)
+    Q_PROPERTY(qreal effectPhase READ effectPhase WRITE setEffectPhase NOTIFY effectParamsChanged)
+    Q_PROPERTY(qreal effectRate READ effectRate WRITE setEffectRate NOTIFY effectParamsChanged)
+    Q_PROPERTY(int effectCount READ effectCount NOTIFY effectsChanged)
+    Q_PROPERTY(QVariantList macros READ macros NOTIFY macrosChanged)
+    Q_PROPERTY(QVariantList views READ views NOTIFY viewsChanged)
+    Q_PROPERTY(QString undoText READ undoText NOTIFY undoChanged)
     Q_PROPERTY(qreal pan READ pan NOTIFY positionChanged)
     Q_PROPERTY(qreal tilt READ tilt NOTIFY positionChanged)
     Q_PROPERTY(qreal fan READ fan WRITE setFan NOTIFY positionChanged)
@@ -117,8 +125,17 @@ public:
     void setEffectBpm(qreal bpm);
     qreal effectSize() const { return m_size; }
     void setEffectSize(qreal size);
-    bool effectSpread() const { return m_spread; }
+    bool effectSpread() const { return m_phase > 0; }
     void setEffectSpread(bool spread);
+    /** Phase spread over the fixtures of a movement effect, in degrees (0 = all together,
+     *  360 = one full cycle from the first to the last fixture) */
+    qreal effectPhase() const { return m_phase; }
+    void setEffectPhase(qreal degrees);
+    /** Speed of an effect against the show tempo (0.25, 0.5, 1, 2, 4) */
+    qreal effectRate() const { return m_rate; }
+    void setEffectRate(qreal rate);
+    /** Effects running in the programmer (several can run on different fixtures) */
+    int effectCount() const { return int(m_effects.count()); }
 
     /* Programmer */
     int programmerCount() const;
@@ -172,6 +189,28 @@ public:
     int linkPeers() const;
     Q_INVOKABLE void tap();
 
+    /* Undo ("Oops"): takes back the last recording type action (store, update, delete,
+     * preset change, playback assignment, clear of the programmer) */
+    QString undoText() const;
+    Q_INVOKABLE bool undo();
+
+    /* Macros: a named list of commands, separated by ";" */
+    static const int MacroCount = 16;
+    QVariantList macros() const;
+    Q_INVOKABLE void macroRun(int index);
+    Q_INVOKABLE void macroStore(int index, const QString &name, const QString &commands);
+    Q_INVOKABLE void macroClear(int index);
+
+    /* Views: a window and a playback page recalled with one key */
+    static const int ViewCount = 6;
+    QVariantList views() const;
+    Q_INVOKABLE void viewRecall(int index);
+    Q_INVOKABLE void viewStore(int index, const QString &name);
+    Q_INVOKABLE void viewClear(int index);
+
+    /** Rename a fixture group of the pool */
+    Q_INVOKABLE void renameGroup(quint32 groupId, const QString &name);
+
     /** Number of recorded cues that follow a preset */
     int presetCueCount(const QString &kind, int index) const;
 
@@ -206,19 +245,26 @@ signals:
     void tempoSourceChanged();
     void sheetActiveChanged();
     void commandLogChanged();
+    void macrosChanged();
+    void viewsChanged();
+    void undoChanged();
 
 private slots:
     void slotSelectionChanged();
     void slotSlotPicked(QString mode, bool isFader, int index, quint32 functionId);
     void slotRefreshSheet();
+    void slotGridPad(int row, int col, bool shift);
+    void updateGridLeds();
 
 private:
     QList<quint32> selectedFixtures() const;
     void applyPosition();
     Function *createEffect(const QString &key, const QList<quint32> &fixtures);
-    void removeEffect(const QString &key, bool deleteFunction);
+    void removeEffectAt(int index, bool deleteFunction);
     void updateEffectParams();
-    uint effectDuration(const QString &key) const;
+    /** Effects the size / phase / rate controls act on: those of the selection, or all */
+    QList<int> effectsInScope() const;
+    void pushUndo(const QString &label);
 
     struct Memory
     {
@@ -254,14 +300,20 @@ private:
 
     struct Effect
     {
+        QString key;
         quint32 functionId;
         quint32 groupId;                // fixture group created for an RGB matrix
+        QList<quint32> fixtures;
+        qreal size;
+        qreal phase;
+        qreal rate;
     };
-    QMap<QString, Effect> m_effects;
+    QList<Effect> m_effects;
 
     qreal m_bpm;
     qreal m_size;
-    bool m_spread;
+    qreal m_phase;
+    qreal m_rate;
     int m_cueCounter;
     qreal m_cueFade;
     QColor m_lastColor;
@@ -293,6 +345,17 @@ private:
 
     QTimer m_sheetTimer;
     QVariantList m_sheet;
+
+    struct Macro { QString name; QString commands; };
+    QVector<Macro> m_macros;
+    int m_macroDepth = 0;
+    struct View { bool used = false; QString name; QString context; int page = 0; };
+    QVector<View> m_views;
+
+    struct Snapshot;
+    QList<QSharedPointer<Snapshot>> m_undo;
+    bool m_undoGuard = false;
+    int m_undoHold = 0;
 
     QStringList m_commandLog;
     QString m_commandFeedback;

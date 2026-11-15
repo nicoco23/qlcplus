@@ -48,6 +48,141 @@ Rectangle
     readonly property color cPosition: "#ffb86b"
     readonly property color cEffect: UISettings.typeEfx
     readonly property color cSequence: UISettings.consoleGo
+    readonly property color cMacro: "#9be36b"
+
+    /* Small editor: one line (a name, a time) or a macro (name + commands) */
+    function askText(title, value, callback)
+    {
+        editPopup.title = title
+        editPopup.macro = false
+        editPopup.callback = callback
+        editField.text = value
+        editPopup.open()
+        editField.forceActiveFocus()
+        editField.selectAll()
+    }
+    function askMacro(index)
+    {
+        var m = programmer.macros[index]
+        editPopup.title = qsTr("Macro %1").arg(index + 1)
+        editPopup.macro = true
+        editPopup.callback = function(name, commands) { programmer.macroStore(index, name, commands) }
+        editField.text = m.used ? m.name : ""
+        editField2.text = m.used ? m.commands : ""
+        editPopup.open()
+        editField.forceActiveFocus()
+    }
+    function seconds(text)
+    {
+        var v = parseFloat(String(text).replace(",", "."))
+        return isNaN(v) ? -1 : v
+    }
+
+    Popup
+    {
+        id: editPopup
+        property string title: ""
+        property bool macro: false
+        property var callback: null
+        parent: plRoot
+        anchors.centerIn: parent
+        width: plRoot.unit * 14
+        modal: true
+        focus: true
+        padding: 12
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        background: Rectangle { color: UISettings.bgMedium; radius: 6; border.color: UISettings.kahoMauve }
+
+        function accept()
+        {
+            var cb = callback
+            close()
+            if (cb)
+                cb(editField.text, editField2.text)
+            plRoot.forceActiveFocus()
+        }
+
+        contentItem: Column
+        {
+            spacing: 8
+            Text
+            {
+                text: editPopup.title
+                color: UISettings.kahoMauveSoft
+                font.family: UISettings.titleFontName
+                font.pixelSize: UISettings.textSizeDefault * 0.8
+            }
+            Rectangle
+            {
+                width: parent.width
+                height: plRoot.unit
+                radius: 4
+                color: UISettings.bgStronger
+                border.color: editField.activeFocus ? UISettings.consoleAccent : UISettings.bgControl
+                TextInput
+                {
+                    id: editField
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    verticalAlignment: TextInput.AlignVCenter
+                    color: UISettings.fgMain
+                    selectionColor: UISettings.kahoMauveDeep
+                    font.family: UISettings.robotoFontName
+                    font.pixelSize: UISettings.textSizeDefault * 0.85
+                    clip: true
+                    onAccepted: editPopup.macro ? editField2.forceActiveFocus() : editPopup.accept()
+                    Text
+                    {
+                        visible: editPopup.macro && editField.text === ""
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: qsTr("Nom")
+                        color: UISettings.bgLighter
+                        font: editField.font
+                    }
+                }
+            }
+            Rectangle
+            {
+                visible: editPopup.macro
+                width: parent.width
+                height: plRoot.unit
+                radius: 4
+                color: UISettings.bgStronger
+                border.color: editField2.activeFocus ? UISettings.consoleAccent : UISettings.bgControl
+                TextInput
+                {
+                    id: editField2
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    verticalAlignment: TextInput.AlignVCenter
+                    color: UISettings.fgMain
+                    selectionColor: UISettings.kahoMauveDeep
+                    font.family: UISettings.robotoFontName
+                    font.pixelSize: UISettings.textSizeDefault * 0.85
+                    clip: true
+                    onAccepted: editPopup.accept()
+                    Text
+                    {
+                        visible: editField2.text === ""
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: qsTr("Group 1 At 100; Preset 4.1; Go 2")
+                        color: UISettings.bgLighter
+                        font: editField2.font
+                    }
+                }
+            }
+            Text
+            {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: editPopup.macro ? qsTr("Commandes de la ligne de commande, séparées par « ; ». Entrée pour valider, Échap pour annuler. Vide = effacer la macro.")
+                                      : qsTr("Entrée pour valider · Échap pour annuler")
+                color: UISettings.fgMedium
+                font.family: UISettings.robotoFontName
+                font.pixelSize: UISettings.textSizeDefault * 0.62
+            }
+        }
+    }
 
     Component.onCompleted: programmer.sheetActive = true
     Component.onDestruction: programmer.sheetActive = false
@@ -289,6 +424,29 @@ Rectangle
                     keyColor: UISettings.fgLight
                     onClicked: programmer.executeCommand("Locate")
                 }
+                ModeKey
+                {
+                    Layout.preferredWidth: plRoot.unit * 2.2
+                    text: qsTr("OOPS")
+                    keyColor: UISettings.consoleRelease
+                    opacity: programmer.undoText === "" ? 0.4 : 1
+                    onClicked: programmer.executeCommand("Oops")
+                    ToolTip.visible: oopsHover.hovered && programmer.undoText !== ""
+                    ToolTip.text: qsTr("Annuler : %1").arg(programmer.undoText)
+                    HoverHandler { id: oopsHover }
+                }
+                ModeKey
+                {
+                    visible: playbackManager.controllerName !== ""
+                    Layout.preferredWidth: plRoot.unit * 3.2
+                    text: playbackManager.apcMode === "prog" ? qsTr("APC : PRESETS") : qsTr("APC : EXEC")
+                    keyColor: UISettings.consoleGo
+                    lit: playbackManager.apcMode === "prog"
+                    onClicked: playbackManager.apcMode = playbackManager.apcMode === "prog" ? "exec" : "prog"
+                    ToolTip.visible: apcHover.hovered
+                    ToolTip.text: qsTr("Pads de l'APC mini : boutons d'exécution, ou groupes (2 rangées), couleurs (2), positions (2) et touches. SHIFT + 1er bouton de scène sur l'APC.")
+                    HoverHandler { id: apcHover }
+                }
                 // show tempo: click to change the source, TAP to beat it in
                 ModeKey
                 {
@@ -312,8 +470,8 @@ Rectangle
                     Layout.fillWidth: true
                     Layout.leftMargin: 8
                     elide: Text.ElideRight
-                    text: plRoot.mode === "store" ? qsTr("STORE : clique sur une case Couleur ou Position pour y enregistrer le réglage actuel · Échap pour annuler")
-                          : plRoot.mode === "delete" ? qsTr("DELETE : clique sur le preset à effacer · Échap pour annuler")
+                    text: plRoot.mode === "store" ? qsTr("STORE : clique sur une case Couleur, Position ou Macro · Échap pour annuler")
+                          : plRoot.mode === "delete" ? qsTr("DELETE : clique sur le preset ou la macro à effacer · Échap pour annuler")
                           : programmer.selectionText
                     color: plRoot.mode !== "" ? UISettings.consoleRelease : UISettings.fgMedium
                     font.family: UISettings.robotoFontName
@@ -353,7 +511,14 @@ Rectangle
                                 tint: plRoot.cGroup
                                 active: modelData.selected
                                 partial: modelData.partial
-                                onClicked: (mouse) => programmer.selectGroup(modelData.id, (mouse.modifiers & Qt.ShiftModifier) || (mouse.modifiers & Qt.ControlModifier))
+                                onClicked: (mouse) =>
+                                {
+                                    if (mouse.button === Qt.RightButton)
+                                        plRoot.askText(qsTr("Nom du groupe %1").arg(index + 1), modelData.name,
+                                                       function(t) { programmer.renameGroup(modelData.id, t) })
+                                    else
+                                        programmer.selectGroup(modelData.id, (mouse.modifiers & Qt.ShiftModifier) || (mouse.modifiers & Qt.ControlModifier))
+                                }
                             }
                         }
                     }
@@ -376,7 +541,17 @@ Rectangle
                                 sub: modelData.cues > 0 ? qsTr("%1 cue").arg(modelData.cues) : ""
                                 swatch: modelData.used ? modelData.color : "transparent"
                                 armed: plRoot.mode === "store" || (plRoot.mode === "delete" && modelData.used)
-                                onClicked: plRoot.presetClick("color", index, modelData.used)
+                                onClicked: (mouse) =>
+                                {
+                                    if (mouse.button === Qt.RightButton)
+                                    {
+                                        if (modelData.used)
+                                            plRoot.askText(qsTr("Nom du preset couleur %1").arg(index + 1), modelData.name,
+                                                           function(t) { programmer.memoryRename("color", index, t) })
+                                    }
+                                    else
+                                        plRoot.presetClick("color", index, modelData.used)
+                                }
                             }
                         }
                     }
@@ -398,7 +573,17 @@ Rectangle
                                 used: modelData.used
                                 sub: modelData.cues > 0 ? qsTr("%1 cue").arg(modelData.cues) : ""
                                 armed: plRoot.mode === "store" || (plRoot.mode === "delete" && modelData.used)
-                                onClicked: plRoot.presetClick("position", index, modelData.used)
+                                onClicked: (mouse) =>
+                                {
+                                    if (mouse.button === Qt.RightButton)
+                                    {
+                                        if (modelData.used)
+                                            plRoot.askText(qsTr("Nom du preset position %1").arg(index + 1), modelData.name,
+                                                           function(t) { programmer.memoryRename("position", index, t) })
+                                    }
+                                    else
+                                        plRoot.presetClick("position", index, modelData.used)
+                                }
                             }
                         }
                     }
@@ -419,7 +604,43 @@ Rectangle
                                 sub: modelData.kind === "move" ? qsTr("mvt") : (modelData.kind === "colour" ? qsTr("coul") : qsTr("dim"))
                                 tint: modelData.kind === "move" ? UISettings.typeEfx : (modelData.kind === "colour" ? UISettings.typeMatrix : UISettings.typeScene)
                                 active: modelData.running
+                                partial: modelData.elsewhere
                                 onClicked: programmer.toggleEffect(modelData.key)
+                            }
+                        }
+                    }
+
+                    // ---- macros
+                    Flow
+                    {
+                        width: parent.width
+                        spacing: plRoot.gap
+                        PoolTitle { text: qsTr("MACROS"); tint: plRoot.cMacro }
+                        Repeater
+                        {
+                            model: programmer.macros
+                            PoolCell
+                            {
+                                number: index + 1
+                                label: modelData.used ? modelData.name : ""
+                                tint: plRoot.cMacro
+                                used: modelData.used
+                                armed: plRoot.mode === "store" || (plRoot.mode === "delete" && modelData.used)
+                                onClicked: (mouse) =>
+                                {
+                                    if (plRoot.mode === "delete")
+                                    {
+                                        programmer.macroClear(index)
+                                        plRoot.mode = ""
+                                    }
+                                    else if (mouse.button === Qt.RightButton || plRoot.mode === "store" || !modelData.used)
+                                    {
+                                        plRoot.mode = ""
+                                        plRoot.askMacro(index)
+                                    }
+                                    else
+                                        programmer.macroRun(index)
+                                }
                             }
                         }
                     }
@@ -440,7 +661,14 @@ Rectangle
                                 sub: modelData.type === "Chaser" ? qsTr("pile") : (modelData.type === "Collection" ? qsTr("coll") : modelData.type.toLowerCase())
                                 tint: plRoot.cSequence
                                 active: playbackManager.runningIds.indexOf(modelData.funcID) >= 0
-                                onClicked: playbackManager.toggleFunction(modelData.funcID)
+                                onClicked: (mouse) =>
+                                {
+                                    if (mouse.button === Qt.RightButton)
+                                        plRoot.askText(qsTr("Nom de la séquence"), modelData.label,
+                                                       function(t) { playbackManager.renameFunction(modelData.funcID, t) })
+                                    else
+                                        playbackManager.toggleFunction(modelData.funcID)
+                                }
                             }
                         }
                         Text
@@ -629,7 +857,7 @@ Rectangle
             SheetHeader
             {
                 title: qsTr("FEUILLE DE SÉQUENCE")
-                hint: qsTr("exécuteur %1").arg(plRoot.sheetExec + 1)
+                hint: qsTr("exécuteur %1 · clic sur un temps pour le changer · clic droit : renommer").arg(plRoot.sheetExec + 1)
             }
             Row
             {
@@ -666,10 +894,13 @@ Rectangle
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 // refreshed with the playbacks (running state, current cue)
-                model: { playbackManager.faders; return playbackManager.cueList(plRoot.sheetExec) }
+                model: { playbackManager.faders; playbackManager.cueRevision; return playbackManager.cueList(plRoot.sheetExec) }
 
                 delegate: Rectangle
                 {
+                    id: cueRow
+                    readonly property var cue: modelData
+                    readonly property int cueIndex: index
                     width: seqSheet.width
                     height: plRoot.unit * 0.75
                     color: modelData.current ? Qt.rgba(UISettings.consoleGo.r, UISettings.consoleGo.g, UISettings.consoleGo.b, 0.2)
@@ -687,7 +918,7 @@ Rectangle
                     Text
                     {
                         x: plRoot.unit * 1.2
-                        width: parent.width - x - plRoot.unit * 4.5
+                        width: parent.width - x - plRoot.unit * 6.4
                         anchors.verticalCenter: parent.verticalCenter
                         text: modelData.name
                         elide: Text.ElideRight
@@ -696,25 +927,65 @@ Rectangle
                         font.pixelSize: UISettings.textSizeDefault * 0.72
                         font.bold: modelData.current
                     }
-                    Text
+                    MouseArea
                     {
-                        anchors.right: parent.right
-                        anchors.rightMargin: plRoot.unit * 2.2
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: modelData.type
-                        color: UISettings.fgMedium
-                        font.family: UISettings.robotoFontName
-                        font.pixelSize: UISettings.textSizeDefault * 0.6
+                        anchors.fill: parent
+                        acceptedButtons: Qt.RightButton
+                        onClicked: plRoot.askText(qsTr("Nom du cue %1").arg(modelData.number), modelData.name,
+                                                  function(t) { playbackManager.renameCue(plRoot.sheetExec, index, t) })
                     }
-                    Text
+                    // fade in, fade out, follow: click to edit
+                    Row
                     {
                         anchors.right: parent.right
-                        anchors.rightMargin: 8
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: modelData.fade > 0 ? qsTr("fondu %1 s").arg(modelData.fade.toFixed(1)) : qsTr("net")
-                        color: UISettings.fgLight
-                        font.family: UISettings.robotoFontName
-                        font.pixelSize: UISettings.textSizeDefault * 0.62
+                        anchors.rightMargin: 4
+                        height: parent.height
+                        spacing: 3
+                        Repeater
+                        {
+                            model: [ { what: "fade", title: qsTr("Fondu d'entrée du cue %1 (secondes)") },
+                                     { what: "out", title: qsTr("Fondu de sortie du cue %1 (secondes)") },
+                                     { what: "follow", title: qsTr("Cue %1 : secondes avant le cue suivant (vide = attendre GO)") } ]
+                            Rectangle
+                            {
+                                id: tCell
+                                readonly property real value: modelData.what === "fade" ? cueRow.cue.fade
+                                                              : (modelData.what === "out" ? cueRow.cue.out : cueRow.cue.follow)
+                                readonly property bool follows: modelData.what === "follow"
+                                visible: !follows || cueRow.cue.stack
+                                width: plRoot.unit * 1.9
+                                height: parent.height - 6
+                                anchors.verticalCenter: parent.verticalCenter
+                                radius: 3
+                                color: tArea.containsMouse ? UISettings.bgControl : "transparent"
+                                border.color: tArea.containsMouse ? UISettings.consoleAccent : UISettings.bgControl
+                                Text
+                                {
+                                    anchors.centerIn: parent
+                                    text: tCell.follows ? (tCell.value < 0 ? qsTr("GO") : qsTr("→ %1 s").arg(tCell.value.toFixed(1)))
+                                                        : (modelData.what === "fade" ? "↑ " : "↓ ") + tCell.value.toFixed(1)
+                                    color: tCell.follows && tCell.value >= 0 ? UISettings.consoleGo
+                                           : (tCell.value > 0 ? UISettings.fgMain : UISettings.fgMedium)
+                                    font.family: UISettings.robotoFontName
+                                    font.pixelSize: UISettings.textSizeDefault * 0.62
+                                }
+                                MouseArea
+                                {
+                                    id: tArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onClicked: plRoot.askText(modelData.title.arg(cueRow.cue.number),
+                                                              tCell.value < 0 ? "" : tCell.value.toFixed(1),
+                                                              function(t)
+                                                              {
+                                                                  var v = plRoot.seconds(t)
+                                                                  if (v < 0 && !tCell.follows)
+                                                                      return
+                                                                  playbackManager.setCueTiming(plRoot.sheetExec, cueRow.cueIndex, modelData.what, v)
+                                                              })
+                                }
+                            }
+                        }
                     }
                 }
 

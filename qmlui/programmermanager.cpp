@@ -114,7 +114,8 @@ ProgrammerManager::ProgrammerManager(QQuickView *view, Doc *doc, ContextManager 
     , m_crossed(false)
     , m_bpm(120)
     , m_size(0.5)
-    , m_spread(true)
+    , m_phase(360)
+    , m_rate(1)
     , m_cueCounter(0)
     , m_cueFade(0)
     , m_pendingCue(Function::invalidId())
@@ -124,6 +125,8 @@ ProgrammerManager::ProgrammerManager(QQuickView *view, Doc *doc, ContextManager 
     , m_sourceBpm(120)
     , m_tempoMult(1)
     , m_link(new LinkClock(this))
+    , m_macros(MacroCount)
+    , m_views(ViewCount)
 {
     setContextResource("qrc:/Programmer.qml");
     setContextTitle(tr("Programmer"));
@@ -132,6 +135,15 @@ ProgrammerManager::ProgrammerManager(QQuickView *view, Doc *doc, ContextManager 
 
     connect(m_contextManager, &ContextManager::selectedFixturesChanged, this, &ProgrammerManager::slotSelectionChanged);
     connect(m_playbacks, &PlaybackManager::slotPicked, this, &ProgrammerManager::slotSlotPicked);
+    connect(m_playbacks, &PlaybackManager::aboutToChange, this, [this](const QString &what) { pushUndo(what); });
+    connect(m_playbacks, &PlaybackManager::gridPad, this, &ProgrammerManager::slotGridPad);
+    connect(m_playbacks, &PlaybackManager::pageChanged, this, &ProgrammerManager::viewsChanged);
+    connect(m_contextManager, &ContextManager::currentContextChanged, this, &ProgrammerManager::viewsChanged);
+    connect(this, &ProgrammerManager::undoChanged, this, &ProgrammerManager::updateGridLeds);
+    connect(m_playbacks, &PlaybackManager::apcModeChanged, this, &ProgrammerManager::updateGridLeds);
+    connect(this, &ProgrammerManager::groupsChanged, this, &ProgrammerManager::updateGridLeds);
+    connect(this, &ProgrammerManager::memoriesChanged, this, &ProgrammerManager::updateGridLeds);
+    connect(this, &ProgrammerManager::programmerChanged, this, &ProgrammerManager::updateGridLeds);
     m_sheetTimer.setInterval(200);
     connect(&m_sheetTimer, &QTimer::timeout, this, &ProgrammerManager::slotRefreshSheet);
     defaultMemories();
@@ -478,23 +490,47 @@ void ProgrammerManager::applyPosition()
 QVariantList ProgrammerManager::effects() const
 {
     QVariantList list;
+    QList<quint32> selected = m_contextManager->selectedFixtureIDList();
     for (const EffectDef &def : EFFECTS)
     {
         QVariantMap map;
         map.insert("key", QString(def.key));
         map.insert("label", tr(def.label));
         map.insert("kind", kindName(def.kind));
-        map.insert("running", m_effects.contains(def.key));
+        // lit when it runs on the selected fixtures (on any fixture without a selection)
+        bool running = false, elsewhere = false;
+        for (const Effect &e : m_effects)
+        {
+            if (e.key != QLatin1String(def.key))
+                continue;
+            bool here = selected.isEmpty();
+            for (quint32 id : e.fixtures)
+                if (selected.contains(id))
+                    here = true;
+            if (here) running = true;
+            else elsewhere = true;
+        }
+        map.insert("running", running);
+        map.insert("elsewhere", elsewhere);
         list.append(map);
     }
     return list;
 }
 
-uint ProgrammerManager::effectDuration(const QString &key) const
+QList<int> ProgrammerManager::effectsInScope() const
 {
-    const EffectDef *def = effectDef(key);
-    qreal beat = 60000.0 / qBound(20.0, m_bpm, 300.0);
-    return uint(qMax(20.0, beat * (def ? def->beatsPerStep : 1)));
+    QList<quint32> selected = m_contextManager->selectedFixtureIDList();
+    QList<int> scope;
+    for (int i = 0; i < m_effects.count(); i++)
+    {
+        bool here = selected.isEmpty();
+        for (quint32 id : m_effects.at(i).fixtures)
+            if (selected.contains(id))
+                here = true;
+        if (here)
+            scope.append(i);
+    }
+    return scope;
 }
 
 Function *ProgrammerManager::createEffect(const QString &key, const QList<quint32> &fixtures)
@@ -516,6 +552,7 @@ Function *ProgrammerManager::createEffect(const QString &key, const QList<quint3
         efx->setYOffset(127);
 
         int added = 0;
+        QList<quint32> used;
         for (quint32 id : fixtures)
         {
             Fixture *fxi = m_doc->fixture(id);
@@ -525,7 +562,10 @@ Function *ProgrammerManager::createEffect(const QString &key, const QList<quint3
                 fxi->channelNumber(QLCChannel::Tilt, QLCChannel::MSB) == QLCChannel::invalid())
                 continue;
             if (efx->addFixture(id, 0))
+            {
                 added++;
+                used.append(id);
+            }
         }
         if (added == 0)
         {
@@ -538,8 +578,8 @@ Function *ProgrammerManager::createEffect(const QString &key, const QList<quint3
             delete efx;
             return nullptr;
         }
-        m_effects.insert(key, { efx->id(), FixtureGroup::invalidId() });
-        m_tempoLinks.insert(efx->id(), def->beatsPerStep);
+        m_effects.append({ key, efx->id(), FixtureGroup::invalidId(), used, m_size, m_phase, m_rate });
+        m_tempoLinks.insert(efx->id(), def->beatsPerStep / m_rate);
         return efx;
     }
 
@@ -594,36 +634,53 @@ Function *ProgrammerManager::createEffect(const QString &key, const QList<quint3
         m_doc->deleteFixtureGroup(grp->id());
         return nullptr;
     }
-    m_effects.insert(key, { mtx->id(), grp->id() });
-    m_tempoLinks.insert(mtx->id(), def->beatsPerStep);
+    m_effects.append({ key, mtx->id(), grp->id(), fixtures, m_size, m_phase, m_rate });
+    m_tempoLinks.insert(mtx->id(), def->beatsPerStep / m_rate);
     return mtx;
 }
 
 void ProgrammerManager::toggleEffect(const QString &key)
 {
-    if (m_effects.contains(key))
-    {
-        removeEffect(key, true);
-        emit effectsChanged();
-        return;
-    }
-
     const EffectDef *def = effectDef(key);
     if (def == nullptr)
         return;
 
-    // only one effect per family: a new circle replaces the eight
-    QStringList same;
-    for (auto it = m_effects.cbegin(); it != m_effects.cend(); ++it)
-    {
-        const EffectDef *other = effectDef(it.key());
-        if (other && other->kind == def->kind)
-            same.append(it.key());
-    }
-    for (const QString &k : same)
-        removeEffect(k, true);
-
     QList<quint32> fixtures = selectedFixtures();
+    auto touches = [&](const Effect &e)
+    {
+        if (fixtures.isEmpty())
+            return true;
+        for (quint32 id : e.fixtures)
+            if (fixtures.contains(id))
+                return true;
+        return false;
+    };
+
+    // already running on these fixtures: stop it
+    bool stopped = false;
+    for (int i = m_effects.count() - 1; i >= 0; i--)
+    {
+        if (m_effects.at(i).key == key && touches(m_effects.at(i)))
+        {
+            removeEffectAt(i, true);
+            stopped = true;
+        }
+    }
+    if (stopped || fixtures.isEmpty())
+    {
+        emit effectsChanged();
+        emit programmerChanged();
+        return;
+    }
+
+    // one effect per family on a fixture: a new circle replaces the eight of the same fixtures,
+    // the effects of the other fixtures keep running
+    for (int i = m_effects.count() - 1; i >= 0; i--)
+    {
+        const EffectDef *other = effectDef(m_effects.at(i).key);
+        if (other && other->kind == def->kind && touches(m_effects.at(i)))
+            removeEffectAt(i, true);
+    }
 
     // the effect takes over the attribute: release the programmer values it drives,
     // otherwise they would hide it
@@ -654,12 +711,12 @@ void ProgrammerManager::toggleEffect(const QString &key)
     emit effectsChanged();
 }
 
-void ProgrammerManager::removeEffect(const QString &key, bool deleteFunction)
+void ProgrammerManager::removeEffectAt(int index, bool deleteFunction)
 {
-    if (m_effects.contains(key) == false)
+    if (index < 0 || index >= m_effects.count())
         return;
 
-    Effect e = m_effects.take(key);
+    Effect e = m_effects.takeAt(index);
     Function *f = m_doc->function(e.functionId);
     if (f != nullptr)
     {
@@ -682,15 +739,14 @@ void ProgrammerManager::removeEffect(const QString &key, bool deleteFunction)
 
 void ProgrammerManager::clearEffects()
 {
-    const QStringList keys = m_effects.keys();
-    for (const QString &key : keys)
-        removeEffect(key, true);
+    while (m_effects.isEmpty() == false)
+        removeEffectAt(int(m_effects.count()) - 1, true);
     emit effectsChanged();
 }
 
 void ProgrammerManager::updateEffectParams()
 {
-    // every effect recorded in a cue keeps following the show tempo
+    // every effect, in the programmer or recorded in a cue, follows the show tempo
     qreal beat = 60000.0 / qBound(20.0, m_bpm, 300.0);
     for (auto it = m_tempoLinks.begin(); it != m_tempoLinks.end(); )
     {
@@ -704,23 +760,21 @@ void ProgrammerManager::updateEffectParams()
         ++it;
     }
 
-    for (auto it = m_effects.cbegin(); it != m_effects.cend(); ++it)
+    for (const Effect &e : m_effects)
     {
-        Function *f = m_doc->function(it.value().functionId);
-        if (f == nullptr)
+        EFX *efx = qobject_cast<EFX *>(m_doc->function(e.functionId));
+        if (efx == nullptr)
             continue;
 
-        f->setDuration(effectDuration(it.key()));
-
-        EFX *efx = qobject_cast<EFX *>(f);
-        if (efx != nullptr)
-        {
-            // relative pattern: 255 would sweep the whole pan/tilt range, keep it stage sized
-            int size = qRound(6 + m_size * 80);
-            efx->setWidth(size);
-            efx->setHeight(size);
-            efx->setPropagationMode(m_spread ? EFX::Asymmetric : EFX::Parallel);
-        }
+        // relative pattern: 255 would sweep the whole pan/tilt range, keep it stage sized
+        int size = qRound(6 + e.size * 80);
+        efx->setWidth(size);
+        efx->setHeight(size);
+        // the phase is spread by hand over the fixtures, in selection order
+        efx->setPropagationMode(EFX::Parallel);
+        const QList<EFXFixture *> fixtures = efx->fixtures();
+        for (int i = 0; i < fixtures.count(); i++)
+            fixtures.at(i)->setStartOffset(fixtures.count() > 1 ? int(qRound(e.phase * i / fixtures.count())) % 360 : 0);
     }
 }
 
@@ -901,15 +955,43 @@ void ProgrammerManager::setEffectSize(qreal size)
     if (qFuzzyCompare(size + 1, m_size + 1))
         return;
     m_size = size;
+    for (int i : effectsInScope())
+        m_effects[i].size = size;
     updateEffectParams();
     emit effectParamsChanged();
 }
 
 void ProgrammerManager::setEffectSpread(bool spread)
 {
-    if (spread == m_spread)
+    setEffectPhase(spread ? 360 : 0);
+}
+
+void ProgrammerManager::setEffectPhase(qreal degrees)
+{
+    degrees = qBound(0.0, degrees, 360.0);
+    if (qFuzzyCompare(degrees + 1, m_phase + 1))
         return;
-    m_spread = spread;
+    m_phase = degrees;
+    for (int i : effectsInScope())
+        m_effects[i].phase = degrees;
+    updateEffectParams();
+    emit effectParamsChanged();
+}
+
+void ProgrammerManager::setEffectRate(qreal rate)
+{
+    rate = qBound(0.125, rate, 8.0);
+    if (qFuzzyCompare(rate, m_rate))
+        return;
+    m_rate = rate;
+    for (int i : effectsInScope())
+    {
+        Effect &e = m_effects[i];
+        const EffectDef *def = effectDef(e.key);
+        e.rate = rate;
+        if (def != nullptr)
+            m_tempoLinks.insert(e.functionId, def->beatsPerStep / rate);
+    }
     updateEffectParams();
     emit effectParamsChanged();
 }
@@ -965,15 +1047,15 @@ quint32 ProgrammerManager::buildCue(const QString &cueName)
         parts.append(scene->id());
     }
 
-    for (auto it = m_effects.cbegin(); it != m_effects.cend(); ++it)
+    for (const Effect &e : m_effects)
     {
-        Function *f = m_doc->function(it.value().functionId);
-        const EffectDef *def = effectDef(it.key());
+        Function *f = m_doc->function(e.functionId);
+        const EffectDef *def = effectDef(e.key);
         if (f == nullptr)
             continue;
         f->setName(multiple ? tr("%1 · %2").arg(cueName, def ? tr(def->label) : QString()) : cueName);
         // the fixture group of a matrix becomes a normal one
-        FixtureGroup *grp = m_doc->fixtureGroup(it.value().groupId);
+        FixtureGroup *grp = m_doc->fixtureGroup(e.groupId);
         if (grp != nullptr)
             grp->setName(tr("%1 · groupe").arg(cueName));
         parts.append(f->id());
@@ -1004,9 +1086,8 @@ quint32 ProgrammerManager::buildCue(const QString &cueName)
 void ProgrammerManager::resetAfterRecord()
 {
     // the effects now belong to the cue: stop them without deleting them
-    const QStringList keys = m_effects.keys();
-    for (const QString &key : keys)
-        removeEffect(key, false);
+    while (m_effects.isEmpty() == false)
+        removeEffectAt(int(m_effects.count()) - 1, false);
     m_contextManager->resetDumpValues();
     m_activeRefs.clear();
     m_cueCounter++;
@@ -1020,6 +1101,8 @@ void ProgrammerManager::resetAfterRecord()
 
 quint32 ProgrammerManager::record(const QString &name, bool toFreeSlot)
 {
+    if (hasContent())
+        pushUndo(tr("enregistrement"));
     QString cueName = name.trimmed().isEmpty() ? nextCueName() : name.trimmed();
     quint32 cueId = buildCue(cueName);
     if (cueId == Function::invalidId())
@@ -1042,6 +1125,7 @@ void ProgrammerManager::recordAppend(const QString &name)
 {
     if (hasContent() == false)
         return;
+    pushUndo(tr("enregistrement"));
     m_pendingName = name.trimmed().isEmpty() ? nextCueName() : name.trimmed();
     m_pendingCue = buildCue(m_pendingName);
     if (m_pendingCue == Function::invalidId())
@@ -1061,7 +1145,12 @@ void ProgrammerManager::startUpdate()
 void ProgrammerManager::slotSlotPicked(QString mode, bool isFader, int index, quint32 functionId)
 {
     if (mode == "append")
+    {
+        // the undo point was taken when the cue was built: one Oops takes back the whole recording
+        m_undoHold++;
         appendToSlot(isFader, index, functionId);
+        m_undoHold--;
+    }
     else if (mode == "update")
         updateSlot(isFader, index, functionId);
 }
@@ -1089,22 +1178,22 @@ void ProgrammerManager::appendToSlot(bool isFader, int index, quint32 slotFid)
         stack = new Chaser(m_doc);
         stack->setName(tr("Pile · %1").arg(current->name()));
         stack->setRunOrder(Function::Loop);
-        stack->setFadeInMode(Chaser::Default);
-        stack->setFadeOutMode(Chaser::Default);
-        stack->setDurationMode(Chaser::Common);
-        stack->setDuration(Function::infiniteSpeed());
+        stack->setFadeInMode(Chaser::PerStep);
+        stack->setFadeOutMode(Chaser::PerStep);
+        stack->setDurationMode(Chaser::PerStep);
         if (m_doc->addFunction(stack) == false)
         {
             delete stack;
             return;
         }
-        stack->addStep(ChaserStep(current->id()));
-        stack->addStep(ChaserStep(cue));
+        stack->addStep(PlaybackManager::cueStep(current, m_doc));
+        stack->addStep(PlaybackManager::cueStep(m_doc->function(cue), m_doc));
         m_playbacks->replaceSlotFunction(isFader, index, stack->id());
     }
     else
     {
-        stack->addStep(ChaserStep(cue));
+        PlaybackManager::usePerStepTimings(stack, m_doc);
+        stack->addStep(PlaybackManager::cueStep(m_doc->function(cue), m_doc));
     }
     m_doc->setModified();
     emit recorded(m_pendingName, tr("ajouté en pas %1 de « %2 »").arg(stack->stepsCount()).arg(stack->name()));
@@ -1115,6 +1204,7 @@ void ProgrammerManager::updateSlot(bool isFader, int index, quint32 slotFid)
     Function *f = m_doc->function(slotFid);
     if (f == nullptr || hasContent() == false)
         return;
+    pushUndo(tr("mise à jour"));
 
     // the function to update: the slot's one, or the current step of a cue stack
     Chaser *stack = qobject_cast<Chaser *>(f);
@@ -1179,14 +1269,14 @@ void ProgrammerManager::updateSlot(bool isFader, int index, quint32 slotFid)
             else
                 m_playbacks->replaceSlotFunction(isFader, index, coll->id());
         }
-        for (auto it = m_effects.cbegin(); it != m_effects.cend(); ++it)
+        for (const Effect &e : m_effects)
         {
-            Function *fx = m_doc->function(it.value().functionId);
-            const EffectDef *def = effectDef(it.key());
+            Function *fx = m_doc->function(e.functionId);
+            const EffectDef *def = effectDef(e.key);
             if (fx == nullptr)
                 continue;
             fx->setName(tr("%1 · %2").arg(coll->name(), def ? tr(def->label) : QString()));
-            FixtureGroup *grp = m_doc->fixtureGroup(it.value().groupId);
+            FixtureGroup *grp = m_doc->fixtureGroup(e.groupId);
             if (grp)
                 grp->setName(tr("%1 · groupe").arg(coll->name()));
             coll->addFunction(fx->id());
@@ -1280,11 +1370,13 @@ void ProgrammerManager::memoryPress(const QString &kind, int index)
     {
         if (m_lastColor.isValid() == false)
             return;
+        pushUndo(tr("preset enregistré"));
         m.color = m_lastColor;
         m.name = m_lastColor.name();
     }
     else
     {
+        pushUndo(tr("preset enregistré"));
         m.pan = m_pan;
         m.tilt = m_tilt;
         m.fan = m_fan;
@@ -1302,6 +1394,7 @@ void ProgrammerManager::memoryClear(const QString &kind, int index)
     QVector<Memory> &list = kind == "color" ? m_colorMemories : m_positionMemories;
     if (index < 0 || index >= list.count() || list[index].used == false)
         return;
+    pushUndo(tr("preset effacé"));
     list[index] = Memory();
     for (int i = m_presetLinks.count() - 1; i >= 0; i--)
         if (m_presetLinks.at(i).kind == kind && m_presetLinks.at(i).index == index)
@@ -1318,6 +1411,12 @@ void ProgrammerManager::resetContents()
     m_tempoLinks.clear();
     m_presetLinks.clear();
     m_activeRefs.clear();
+    m_macros = QVector<Macro>(MacroCount);
+    m_views = QVector<View>(ViewCount);
+    m_undo.clear();
+    emit macrosChanged();
+    emit viewsChanged();
+    emit undoChanged();
     defaultMemories();
     emit memoriesChanged();
 }
@@ -1371,6 +1470,7 @@ bool ProgrammerManager::memoryStore(const QString &kind, int index)
         return false;
     if (kind == "color" && m_lastColor.isValid() == false)
         return false;
+    pushUndo(tr("preset enregistré"));
     QString keep = list[index].used ? list[index].name : QString();
     list[index] = Memory();
     memoryPress(kind, index);       // empty slot: stores
@@ -1386,6 +1486,7 @@ void ProgrammerManager::memoryRename(const QString &kind, int index, const QStri
     QVector<Memory> &list = kind == "color" ? m_colorMemories : m_positionMemories;
     if (index < 0 || index >= list.count() || list[index].used == false || name.trimmed().isEmpty())
         return;
+    pushUndo(tr("preset renommé"));
     list[index].name = name.trimmed();
     m_doc->setModified();
     emit memoriesChanged();
@@ -1427,6 +1528,26 @@ bool ProgrammerManager::loadXML(QXmlStreamReader &root)
             if (link.fixtures.isEmpty() == false)
                 m_presetLinks.append(link);
         }
+        else if (root.name() == QLatin1String("Macro"))
+        {
+            QXmlStreamAttributes a = root.attributes();
+            int index = a.value("Index").toInt();
+            if (index >= 0 && index < m_macros.count())
+                m_macros[index] = { a.value("Name").toString(), a.value("Commands").toString() };
+        }
+        else if (root.name() == QLatin1String("View"))
+        {
+            QXmlStreamAttributes a = root.attributes();
+            int index = a.value("Index").toInt();
+            if (index >= 0 && index < m_views.count())
+            {
+                View &v = m_views[index];
+                v.used = true;
+                v.name = a.value("Name").toString();
+                v.context = a.value("Window").toString();
+                v.page = a.value("Page").toInt();
+            }
+        }
         if (root.name() == QLatin1String("Memory"))
         {
             QXmlStreamAttributes a = root.attributes();
@@ -1452,6 +1573,8 @@ bool ProgrammerManager::loadXML(QXmlStreamReader &root)
         root.skipCurrentElement();
     }
     emit memoriesChanged();
+    emit macrosChanged();
+    emit viewsChanged();
     return true;
 }
 
@@ -1481,6 +1604,27 @@ bool ProgrammerManager::saveXML(QXmlStreamWriter *doc) const
         doc->writeAttribute("Kind", link.kind == "color" ? "Color" : "Position");
         doc->writeAttribute("Index", QString::number(link.index));
         doc->writeAttribute("Fixtures", ids.join(','));
+        doc->writeEndElement();
+    }
+    for (int i = 0; i < m_macros.count(); i++)
+    {
+        if (m_macros.at(i).commands.isEmpty())
+            continue;
+        doc->writeStartElement("Macro");
+        doc->writeAttribute("Index", QString::number(i));
+        doc->writeAttribute("Name", m_macros.at(i).name);
+        doc->writeAttribute("Commands", m_macros.at(i).commands);
+        doc->writeEndElement();
+    }
+    for (int i = 0; i < m_views.count(); i++)
+    {
+        if (m_views.at(i).used == false)
+            continue;
+        doc->writeStartElement("View");
+        doc->writeAttribute("Index", QString::number(i));
+        doc->writeAttribute("Name", m_views.at(i).name);
+        doc->writeAttribute("Window", m_views.at(i).context);
+        doc->writeAttribute("Page", QString::number(m_views.at(i).page));
         doc->writeEndElement();
     }
     for (int pass = 0; pass < 2; pass++)
@@ -1513,6 +1657,8 @@ bool ProgrammerManager::saveXML(QXmlStreamWriter *doc) const
 
 void ProgrammerManager::clearProgrammer()
 {
+    if (hasContent())
+        pushUndo(tr("programmeur vidé"));
     clearEffects();
     m_contextManager->resetDumpValues();
     m_activeRefs.clear();
