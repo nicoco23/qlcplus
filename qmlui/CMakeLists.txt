@@ -186,6 +186,10 @@ if(KAHO_ABLETON_LINK)
     include(${abletonlink_SOURCE_DIR}/AbletonLinkConfig.cmake)
     target_link_libraries(${module_name} PRIVATE Ableton::Link)
     target_compile_definitions(${module_name} PRIVATE KAHO_ABLETON_LINK)
+    if(WIN32)
+        # Link's config only adds these for MSVC; MinGW needs them explicitly
+        target_link_libraries(${module_name} PRIVATE iphlpapi winmm ws2_32)
+    endif()
 endif()
 
 target_compile_definitions(${module_name} PRIVATE
