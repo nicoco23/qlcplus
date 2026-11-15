@@ -194,30 +194,23 @@ jobs:
           cd /c/qlcplus
           ${{ env.QTDIR }}/bin/windeployqt --qmldir $SRC_DIR/qmlui/qml qlcplus5.exe qlcplusengine.dll plugins/dmxusb.dll
 
-      # The install step takes the compiler runtime (libwinpthread, libstdc++, libgcc...) from the
-      # MSYS2 preinstalled on the runner (C:\msys64), older than the one that built the program:
-      # the executable then asks for symbols these DLLs do not have and refuses to start.
-      - name: Ship the runtime DLLs of the compiler that built the program
+      # The install step takes the compiler runtime from the MSYS2 preinstalled on the runner (C:\msys64),
+      # older than the one that built the program. libstdc++ and libgcc must stay the old ones: the Qt
+      # binaries (built by Qt with their own MinGW) need them. libwinpthread must be the one of the
+      # compiler used here: the program asks for functions the old one does not have.
+      - name: Ship the libwinpthread of the compiler that built the program
         shell: msys2 {0}
         run: |
-          cd /c/qlcplus
-          for dll in *.dll; do
-            case "$dll" in Qt6*|qlcplus*) continue ;; esac
-            if [ -f "/mingw64/bin/$dll" ]; then cp -f "/mingw64/bin/$dll" "$dll"; echo "runtime: $dll"; fi
-          done
-          for dll in libwinpthread-1.dll libstdc++-6.dll libgcc_s_seh-1.dll; do
-            cp -f "/mingw64/bin/$dll" "$dll"
-          done
-          # every symbol the program takes from winpthread must exist in the DLL shipped with it
-          objdump -p libwinpthread-1.dll | grep -o 'pthread_[A-Za-z0-9_]*' | sort -u > /tmp/exported.txt
-          [ -s /tmp/exported.txt ] || { echo "::error::could not read the exports of libwinpthread-1.dll"; exit 1; }
-          missing=0
-          for bin in qlcplus5.exe qlcplusengine.dll; do
-            objdump -p "$bin" | sed -n '/DLL Name: libwinpthread-1.dll/,/DLL Name: [^l]/p' | { grep -o 'pthread_[A-Za-z0-9_]*' || true; } | sort -u > /tmp/needed.txt
-            echo "$bin: $(wc -l < /tmp/needed.txt) pthread symbols needed"
-            for sym in $(comm -23 /tmp/needed.txt /tmp/exported.txt); do echo "::error::$bin needs $sym, missing from libwinpthread-1.dll"; missing=1; done
-          done
-          exit $missing
+          cp -f /mingw64/bin/libwinpthread-1.dll /c/qlcplus/libwinpthread-1.dll
+          # used by the Qt 3D RHI renderer plugin, not deployed by windeployqt
+          if [ -f "${{ env.QTDIR }}/bin/Qt6ShaderTools.dll" ]; then cp -f "${{ env.QTDIR }}/bin/Qt6ShaderTools.dll" /c/qlcplus/; fi
+
+      # A build that succeeds can still refuse to start on Windows ("entry point not found"):
+      # every function taken from a shipped DLL must exist in that DLL.
+      - name: Check that the installed program can find all its functions
+        shell: bash
+        run: |
+          python .github/scripts/check-dlls.py "C:/qlcplus" "$RUNNER_TEMP/msys64/mingw64/bin/objdump.exe"
 
       - name: Build installation package
         shell: msys2 {0}
