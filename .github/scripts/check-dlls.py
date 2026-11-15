@@ -37,9 +37,9 @@ for path in binaries:
         if line.startswith(("The Function Table", "PE File Base Relocations")):
             mode = None
         if mode == "export":
-            m = re.match(r"\s*\[\s*\d+\]\s+(\S+)", line)
-            if m:
-                exported.add(m.group(1))
+            # "[  12] name" or, with a recent binutils, "[  12] +base[  13]  000c name"
+            if re.match(r"\s*\[\s*\d+\]", line) and line.split():
+                exported.add(line.split()[-1])
         elif mode == "import":
             m = re.match(r"\s*[0-9a-f]+\s+(?:<none>\s+)?[0-9a-f]+\s+(\S+)\s*$", line)
             if m:
