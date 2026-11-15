@@ -194,6 +194,30 @@ jobs:
           cd /c/qlcplus
           ${{ env.QTDIR }}/bin/windeployqt --qmldir $SRC_DIR/qmlui/qml qlcplus5.exe qlcplusengine.dll plugins/dmxusb.dll
 
+      # The install step takes the compiler runtime (libwinpthread, libstdc++, libgcc...) from the
+      # MSYS2 preinstalled on the runner (C:\msys64), older than the one that built the program:
+      # the executable then asks for symbols these DLLs do not have and refuses to start.
+      - name: Ship the runtime DLLs of the compiler that built the program
+        shell: msys2 {0}
+        run: |
+          cd /c/qlcplus
+          for dll in *.dll; do
+            case "$dll" in Qt6*|qlcplus*) continue ;; esac
+            if [ -f "/mingw64/bin/$dll" ]; then cp -f "/mingw64/bin/$dll" "$dll"; echo "runtime: $dll"; fi
+          done
+          for dll in libwinpthread-1.dll libstdc++-6.dll libgcc_s_seh-1.dll; do
+            cp -f "/mingw64/bin/$dll" "$dll"
+          done
+          # every symbol the program takes from winpthread must exist in the DLL shipped with it
+          objdump -p libwinpthread-1.dll | awk '/\[Ordinal\/Name Pointer\] Table/{t=1;next} t&&NF>=3{print $NF}' | sort -u > /tmp/exported.txt
+          missing=0
+          for bin in qlcplus5.exe qlcplusengine.dll; do
+            objdump -p "$bin" | awk '/DLL Name: libwinpthread-1.dll/{t=1;next} /DLL Name:/{t=0} t&&NF>=3&&$1~/^[0-9a-f]+$/{print $NF}' | sort -u > /tmp/needed.txt
+            for sym in $(comm -23 /tmp/needed.txt /tmp/exported.txt); do echo "::error::$bin needs $sym, missing from libwinpthread-1.dll"; missing=1; done
+          done
+          [ -s /tmp/exported.txt ] || { echo "::error::could not read the exports of libwinpthread-1.dll"; exit 1; }
+          exit $missing
+
       - name: Build installation package
         shell: msys2 {0}
         run: |
